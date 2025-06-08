@@ -52,6 +52,8 @@ function App() {
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/plan" element={<TripPlanner />} />
+              <Route path="/itinerary" element={<Itinerary />} />
+              <Route path="/my-trips" element={<SavedTrips />} />
             </Routes>
           </div>
         </Router>

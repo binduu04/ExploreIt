@@ -1,11 +1,14 @@
-// src/pages/Landing.jsx - Modern & Eye-Catching Version
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapPin, Calendar, Sparkles, Globe, Compass, Camera, Star, ArrowRight, Play } from 'lucide-react'
+import { MapPin, Calendar, Sparkles, Globe, Compass, Camera, Star, ArrowRight, Play, User, LogOut } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import LoginModal from '../components/LoginModal'
 
 const Landing = () => {
   const navigate = useNavigate()
+  const { user, isLoggedIn, logout, loading } = useAuth()
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -14,6 +17,41 @@ const Landing = () => {
     window.addEventListener('mousemove', handleMouseMove)
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
+
+  const handleSignInClick = () => {
+    if (isLoggedIn) {
+      // If user is logged in, show dropdown menu or navigate to dashboard
+      navigate('/my-trips')
+    } else {
+      // Show login modal
+      setShowLoginModal(true)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
+
+  const handleLoginSuccess = () => {
+    setShowLoginModal(false)
+    // Optional: Navigate to saved trips after login
+    navigate('/my-trips')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-xl">Loading ExploreIt...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
@@ -40,14 +78,47 @@ const Landing = () => {
             </div>
             <span className="text-3xl font-bold">ExploreIt</span>
           </div>
-          <button className="px-6 py-2 border border-white/20 rounded-full hover:bg-white/10 transition-all duration-300">
-            Sign In
-          </button>
+          
+          {/* User Menu */}
+          <div className="flex items-center space-x-4">
+            {isLoggedIn ? (
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2 text-sm">
+                  <User className="w-4 h-4" />
+                  <span>
+                    {user?.isAnonymous ? 'Anonymous User' : (user?.displayName || user?.email || 'User')}
+                  </span>
+                </div>
+                
+                <button
+                  onClick={() => navigate('/my-trips')}
+                  className="px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-full hover:bg-blue-500/30 transition-all duration-300 text-sm"
+                >
+                  My Trips
+                </button>
+                
+                <button
+                  onClick={handleLogout}
+                  className="p-2 border border-white/20 rounded-full hover:bg-white/10 transition-all duration-300"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={handleSignInClick}
+                className="px-6 py-2 border border-white/20 rounded-full hover:bg-white/10 transition-all duration-300"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
         </nav>
       </header>
 
       {/* Hero Section */}
-      <section className="relative z-10 px-6 pt-20">
+      <section className="relative z-10 px-6 pt-14">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center min-h-[80vh]">
             
@@ -203,6 +274,14 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={handleLoginSuccess}
+        message="Welcome to ExploreIt!"
+      />
     </div>
   )
 }
