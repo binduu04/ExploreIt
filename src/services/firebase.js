@@ -5,12 +5,6 @@ import { getFirestore, collection, addDoc, getDocs, query, where, orderBy } from
 
 // Replace with your Firebase config
 const firebaseConfig = {
-//   apiKey: "your-api-key-here",
-//   authDomain: "your-project.firebaseapp.com",
-//   projectId: "your-project-id",
-//   storageBucket: "your-project.appspot.com",
-//   messagingSenderId: "123456789",
-//   appId: "your-app-id"
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -21,14 +15,11 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig)
-
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app)
 export const googleProvider = new GoogleAuthProvider()
-
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app)
-
 // Auth Functions
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider)
 export const signInAnonymous = () => signInAnonymously(auth)

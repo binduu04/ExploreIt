@@ -42,6 +42,7 @@ import TripPlanner from './pages/TripPlanner'
 import Itinerary from './pages/Itinerary'
 import SavedTrips from './pages/SavedTrips'
 import './App.css'
+import APITestComponent from './components/APITestComponent'
 
 function App() {
   return (
@@ -54,6 +55,7 @@ function App() {
               <Route path="/plan" element={<TripPlanner />} />
               <Route path="/itinerary" element={<Itinerary />} />
               <Route path="/my-trips" element={<SavedTrips />} />
+              <Route path="/test-api" element={<APITestComponent />} />
             </Routes>
           </div>
         </Router>
