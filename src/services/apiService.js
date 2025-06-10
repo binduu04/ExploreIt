@@ -9,6 +9,10 @@ const getWeatherForecast = async (destination, startDate, duration) => {
   const limitedDuration = Math.min(duration, 10)
   
   try {
+
+    // not needed.... for calling geocoding...
+
+
     // Get coordinates for the destination
     const geoResponse = await fetch(
       `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(destination)}&limit=1&appid=${WEATHER_API_KEY}`
@@ -103,68 +107,266 @@ const getWeatherForecast = async (destination, startDate, duration) => {
   }
 }
 
-// Create prompt for Gemini API
+// // Create prompt for Gemini API
+// const createPrompt = (formData, weatherData) => {
+//   const weatherSummary = weatherData.forecast.map((day, index) => 
+//     `Day ${index + 1}: ${day.temperature}°C, ${day.description}`
+//   ).join(', ')
+
+//   return `Create a ${formData.duration}-day travel itinerary for ${formData.destination}.
+
+// REQUIREMENTS:
+// - Duration: ${formData.duration} days
+// - Start Date: ${formData.startDate}
+// - Budget: ${formData.budget}
+// - Group: ${formData.groupType}
+// - Interests: ${formData.preferences}
+// - Weather: ${weatherSummary}
+
+// RESPOND WITH ONLY VALID JSON (no markdown, no extra text):
+
+// {
+//   "summary": {
+//     "title": "Trip title",
+//     "description": "Brief description",
+//     "highlights": ["highlight1", "highlight2", "highlight3"]
+//   },
+//   "itinerary": [
+//     {
+//       "day": 1,
+//       "date": "2025-06-11",
+//       "temperature": 25,
+//       "condition": "Clear",
+//       "morning": {
+//         "activity": "Activity name",
+//         "location": "Location",
+//         "duration": "2 hours",
+//         "description": "Brief description",
+//         "cost": "Cost estimate"
+//       },
+//       "afternoon": {
+//         "activity": "Activity name",
+//         "location": "Location", 
+//         "duration": "3 hours",
+//         "description": "Brief description",
+//         "cost": "Cost estimate"
+//       },
+//       "evening": {
+//         "activity": "Activity name",
+//         "location": "Location",
+//         "duration": "2 hours", 
+//         "description": "Brief description",
+//         "cost": "Cost estimate"
+//       }
+//     }
+//   ],
+//   "tips": {
+//     "transportation": "Transportation advice",
+//     "budget": ["tip1", "tip2", "tip3"],
+//     "packing": ["item1", "item2", "item3"]
+//   }
+// }
+
+// IMPORTANT: Return ONLY the JSON object, no other text or formatting.`
+// }
+
+
+// Enhanced prompt creation for better Gemini responses
 const createPrompt = (formData, weatherData) => {
-  const weatherSummary = weatherData.forecast.map((day, index) => 
-    `Day ${index + 1}: ${day.temperature}°C, ${day.description}`
-  ).join(', ')
+  // Create detailed weather summary with recommendations
+  const weatherSummary = weatherData.forecast.map((day, index) => {
+    const weatherAdvice = getWeatherAdvice(day.condition, day.temperature);
+    return `Day ${index + 1} (${day.date}): ${day.temperature}°C, ${day.description} - ${weatherAdvice}`;
+  }).join('\n');
 
-  return `Create a ${formData.duration}-day travel itinerary for ${formData.destination}.
+  // Create budget guidelines
+  const budgetGuidelines = getBudgetGuidelines(formData.budget);
+  
+  // Create group-specific instructions
+  const groupInstructions = getGroupInstructions(formData.groupType);
 
-REQUIREMENTS:
+  return `You are an expert travel planner creating a ${formData.duration}-day itinerary for ${formData.destination}.
+
+TRAVELER PROFILE:
+- Destination: ${formData.destination}
 - Duration: ${formData.duration} days
 - Start Date: ${formData.startDate}
-- Budget: ${formData.budget}
-- Group: ${formData.groupType}
+- Budget Level: ${formData.budget}
+- Group Type: ${formData.groupType}
 - Interests: ${formData.preferences}
-- Weather: ${weatherSummary}
 
-RESPOND WITH ONLY VALID JSON (no markdown, no extra text):
+WEATHER FORECAST:
+${weatherSummary}
+
+SPECIFIC REQUIREMENTS:
+${budgetGuidelines}
+${groupInstructions}
+
+ACTIVITY GUIDELINES:
+- Morning (9:00-12:00): Focus on outdoor activities, sightseeing, or cultural experiences
+- Afternoon (12:00-17:00): Main attractions, tours, or experiences (consider weather)
+- Evening (17:00-21:00): Dining, entertainment, or relaxed activities
+
+COST ESTIMATION RULES:
+- Provide realistic cost estimates in local currency or USD
+- Include approximate costs for activities, meals, and transportation
+- Consider the specified budget level when suggesting activities
+- Mention free/low-cost alternatives when possible
+
+LOCATION SPECIFICITY:
+- Use exact addresses or landmark names when possible
+- Suggest specific restaurants, attractions, or venues
+- Include practical details like opening hours considerations
+- Mention transportation between locations
+
+WEATHER ADAPTATION:
+- Adjust activities based on daily weather conditions
+- Suggest indoor alternatives for rainy/cold days
+- Recommend appropriate clothing or gear
+- Consider seasonal factors affecting attractions
+
+OUTPUT FORMAT - Return ONLY valid JSON with this exact structure:
 
 {
   "summary": {
-    "title": "Trip title",
-    "description": "Brief description",
-    "highlights": ["highlight1", "highlight2", "highlight3"]
+    "title": "Compelling trip title reflecting destination and experience",
+    "description": "2-3 sentence overview highlighting unique aspects and experiences",
+    "highlights": ["Must-see attraction/experience", "Unique local activity", "Cultural/culinary highlight"]
   },
   "itinerary": [
     {
       "day": 1,
-      "date": "2025-06-11",
+      "date": "YYYY-MM-DD",
       "temperature": 25,
-      "condition": "Clear",
+      "condition": "Weather condition",
       "morning": {
-        "activity": "Activity name",
-        "location": "Location",
-        "duration": "2 hours",
-        "description": "Brief description",
-        "cost": "Cost estimate"
+        "activity": "Specific activity name",
+        "location": "Exact location/address",
+        "duration": "X hours",
+        "description": "Detailed description with what to expect",
+        "cost": "Cost estimate with currency"
       },
       "afternoon": {
-        "activity": "Activity name",
-        "location": "Location", 
-        "duration": "3 hours",
-        "description": "Brief description",
-        "cost": "Cost estimate"
+        "activity": "Specific activity name",
+        "location": "Exact location/address",
+        "duration": "X hours",
+        "description": "Detailed description with what to expect",
+        "cost": "Cost estimate with currency"
       },
       "evening": {
-        "activity": "Activity name",
-        "location": "Location",
-        "duration": "2 hours", 
-        "description": "Brief description",
-        "cost": "Cost estimate"
+        "activity": "Specific activity name",
+        "location": "Exact location/address",
+        "duration": "X hours",
+        "description": "Detailed description with what to expect",
+        "cost": "Cost estimate with currency"
       }
     }
   ],
   "tips": {
-    "transportation": "Transportation advice",
-    "budget": ["tip1", "tip2", "tip3"],
-    "packing": ["item1", "item2", "item3"]
+    "transportation": "General transportation advice for getting around",
+    "budget": ["Money-saving tip 1", "Money-saving tip 2", "Free activity suggestion", "Budget-friendly dining tip"],
+    "packing": ["Essential item 1", "Weather-appropriate item", "Useful gadget/tool", "Local-specific item"],
+    "cultural": ["Cultural custom to be aware of", "Useful local phrase", "Etiquette tip"],
+    "safety": ["Safety tip 1", "Safety tip 2", "Emergency contact info"]
   }
 }
 
-IMPORTANT: Return ONLY the JSON object, no other text or formatting.`
-}
+CRITICAL INSTRUCTIONS:
+1. Return ONLY the JSON object - no explanations, markdown, or additional text
+2. Ensure all JSON syntax is valid (no trailing commas, proper quotes)
+3. Make every recommendation specific and actionable
+4. Adapt ALL activities to the weather forecast provided
+5. Ensure costs align with the specified budget level
+6. Include practical details like timing, booking requirements, etc.
+7. Consider ${formData.groupType} group dynamics in all recommendations
+8. Keep tips arrays simple and directly usable
+
+Generate the itinerary now:`;
+};
+
+// Helper functions for better prompt customization
+const getWeatherAdvice = (condition, temperature) => {
+  const weatherTips = {
+    'Clear': temperature > 25 ? 'Perfect for outdoor activities, bring sun protection' : 'Great weather for sightseeing',
+    'Clouds': 'Good for walking tours, comfortable temperatures',
+    'Rain': 'Plan indoor activities, bring waterproof gear',
+    'Drizzle': 'Light rain gear recommended, still good for covered attractions',
+    'Thunderstorm': 'Focus on indoor activities, museums, shopping',
+    'Snow': 'Dress warmly, winter activities possible',
+    'Mist': 'Visibility may be limited, good for cozy indoor experiences',
+    'Fog': 'Limited visibility, perfect for museums and indoor attractions'
+  };
+  
+  return weatherTips[condition] || 'Check weather conditions and dress appropriately';
+};
+
+const getBudgetGuidelines = (budget) => {
+  const budgetMap = {
+    'budget': `
+BUDGET CONSTRAINTS (Budget Travel):
+- Prioritize free and low-cost activities
+- Suggest budget accommodations and local eateries
+- Include free walking tours, public parks, and museums with free days
+- Recommend public transportation over taxis
+- Focus on authentic local experiences that don't require high spending`,
+    
+    'mid-range': `
+BUDGET GUIDELINES (Mid-Range Travel):
+- Balance between experiences and cost
+- Include mix of free attractions and paid experiences
+- Suggest good value restaurants and moderate activities
+- Allow for some guided tours and cultural experiences
+- Recommend efficient transportation options`,
+    
+    'luxury': `
+BUDGET APPROACH (Luxury Travel):
+- Focus on premium experiences and exclusive access
+- Suggest high-end restaurants, private tours, and luxury services
+- Include unique experiences and VIP access where available
+- Recommend comfort and convenience in all suggestions
+- Consider helicopter tours, private guides, and premium accommodations`
+  };
+  
+  return budgetMap[budget.toLowerCase()] || budgetMap['mid-range'];
+};
+
+const getGroupInstructions = (groupType) => {
+  const groupMap = {
+    'solo': `
+GROUP CONSIDERATIONS (Solo Traveler):
+- Ensure activities are solo-friendly and safe
+- Include opportunities to meet other travelers
+- Suggest group tours or social activities
+- Consider solo dining options and social spaces
+- Focus on personal interests and flexibility`,
+    
+    'couple': `
+GROUP CONSIDERATIONS (Couple):
+- Include romantic experiences and intimate settings
+- Suggest couple-friendly activities and restaurants
+- Balance relaxation with adventure
+- Consider photo opportunities and memorable moments
+- Include both shared experiences and individual interests`,
+    
+    'family': `
+GROUP CONSIDERATIONS (Family with Children):
+- Ensure all activities are family-friendly and age-appropriate
+- Include educational and interactive experiences
+- Plan for shorter attention spans and rest breaks
+- Suggest family restaurants and kid-friendly venues
+- Consider safety and accessibility for children`,
+    
+    'friends': `
+GROUP CONSIDERATIONS (Group of Friends):
+- Focus on social and group activities
+- Include nightlife and entertainment options
+- Suggest group dining and shared experiences
+- Consider group discounts and package deals
+- Balance group activities with individual exploration time`
+  };
+  
+  return groupMap[groupType.toLowerCase()] || groupMap['solo'];
+};
 
 // Generate itinerary with Gemini API
 const generateItineraryWithGemini = async (formData, weatherData) => {
