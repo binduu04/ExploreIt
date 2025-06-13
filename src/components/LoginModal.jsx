@@ -45,9 +45,9 @@ const LoginModal = ({ isOpen, onClose, onSuccess, message = "Save this trip?" })
           <h2 className="text-2xl font-bold text-gray-800">{message}</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors "
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 text-black" />
           </button>
         </div>
 
@@ -71,7 +71,7 @@ const LoginModal = ({ isOpen, onClose, onSuccess, message = "Save this trip?" })
                   alt="Google" 
                   className="w-5 h-5"
                 />
-                <span>Continue with Google</span>
+                <span className="text-black">Continue with Google</span>
               </>
             )}
           </button>
@@ -98,8 +98,8 @@ const LoginModal = ({ isOpen, onClose, onSuccess, message = "Save this trip?" })
         )}
 
         <div className="mt-6 text-sm text-gray-500 text-center">
-          <p className="mb-2">🔐 <strong>With Google:</strong> Save across all devices</p>
-          <p>👤 <strong>Anonymous:</strong> Save locally (this device only)</p>
+          <p className="mb-2">🔐 <strong>With Google:</strong> Get to save your trips! </p>
+          <p>👤 <strong>Anonymous:</strong>Not bad, still can generate your itinerary!</p>
         </div>
       </div>
     </div>

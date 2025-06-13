@@ -1,18 +1,609 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useTrip } from '../context/TripContext'
 import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 const Itinerary = () => {
+  const navigate = useNavigate()
   const { currentTrip, loading, error, saveTrip, clearError } = useTrip()
   const { user } = useAuth()
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
+
+  const handleRegenerateItinerary = async () => {
+  const confirmed = window.confirm('Are you sure you want to regenerate your itinerary? This will create a new itinerary with the same parameters.');
+  if (confirmed) {
+    // You can either:
+    // 1. Navigate back to the form with pre-filled data
+    navigate('/plan', { 
+      state: { 
+        regenerate: true,
+        tripData: {
+          destination: currentTrip.destination,
+          startDate: currentTrip.startDate,
+          duration: currentTrip.duration,
+          budget: currentTrip.budget,
+          groupType: currentTrip.groupType,
+          interests: currentTrip.interests
+        }
+      }
+    });
+    // OR 2. Call your trip generation function directly
+    // await generateNewItinerary(currentTrip);
+  }
+};
+
+  // Export to PDF function using browser's print functionality with better formatting
+  const exportToPDF = async () => {
+    setExportLoading(true)
+    try {
+      // Create a new window with the content
+      const printWindow = window.open('', '_blank')
+      const element = document.getElementById('itinerary-content')
+      
+      // Create optimized print styles
+      const printStyles = `
+        <style>
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+          }
+          
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            font-size: 14px;
+            margin: 0;
+            padding: 20px;
+            background: white;
+          }
+          
+          @media print {
+            body { 
+              margin: 0; 
+              padding: 15px; 
+              font-size: 12px;
+            }
+            .no-print { 
+              display: none !important; 
+            }
+            .break-inside-avoid { 
+              break-inside: avoid; 
+              page-break-inside: avoid;
+            }
+            .page-break-before {
+              page-break-before: always;
+            }
+            .gradient-bg {
+              background: #3b82f6 !important;
+              color: white !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .gradient-card {
+              background: #f8fafc !important;
+              border: 1px solid #e2e8f0 !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .activity-morning { 
+              background: #fef3c7 !important; 
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .activity-afternoon { 
+              background: #dbeafe !important; 
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .activity-evening { 
+              background: #fce7f3 !important; 
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .tip-card {
+              background: #f0f9ff !important;
+              border: 1px solid #bae6fd !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+          }
+          
+          .print-header {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+          }
+          
+          .print-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+          }
+          
+          .print-subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 20px;
+          }
+          
+          .print-details {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 14px;
+          }
+          
+          .print-detail-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            white-space: nowrap;
+          }
+          
+          .day-section {
+            margin-bottom: 30px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          
+          .day-header {
+            background: #1e40af;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+          }
+          
+          .activity-block {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #3b82f6;
+          }
+          
+          .activity-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #1f2937;
+          }
+          
+          .activity-meta {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #6b7280;
+          }
+          
+          .activity-description {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #374151;
+          }
+          
+          .tips-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+          }
+          
+          .tips-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #1f2937;
+          }
+          
+          .tip-item {
+            margin-bottom: 15px;
+          }
+          
+          .tip-item h4 {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #374151;
+          }
+          
+          .tip-list {
+            list-style: none;
+            padding-left: 0;
+          }
+          
+          .tip-list li {
+            margin-bottom: 5px;
+            padding-left: 20px;
+            position: relative;
+          }
+          
+          .tip-list li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #3b82f6;
+            font-weight: bold;
+          }
+          
+          .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+          }
+        </style>
+      `
+
+      // Create structured content for better PDF formatting
+      let structuredContent = `
+        <div class="print-header gradient-bg">
+          <div class="print-title">${currentTrip.summary?.title || `Journey to ${currentTrip.destination}`}</div>
+          <div class="print-subtitle">${currentTrip.summary?.description || `Discover ${currentTrip.destination} in ${currentTrip.duration} incredible days`}</div>
+          <div class="print-details">
+            <div class="print-detail-item">📅 ${formatDate(currentTrip.startDate)}</div>
+            <div class="print-detail-item">⏱️ ${currentTrip.duration} days</div>
+            <div class="print-detail-item">💰 ${currentTrip.budget}</div>
+            <div class="print-detail-item">👥 ${currentTrip.groupType}</div>
+          </div>
+        </div>
+      `
+
+      // Add highlights if available
+      if (currentTrip.summary?.highlights) {
+        structuredContent += `
+          <div class="gradient-card" style="padding: 20px; margin-bottom: 25px; border-radius: 10px;">
+            <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">✨ Trip Highlights</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">
+              ${currentTrip.summary.highlights.map(highlight => 
+                `<div style="display: flex; align-items: center; padding: 8px; background: #fef3c7; border-radius: 8px; font-size: 13px;">
+                  <span style="margin-right: 8px;">⭐</span>
+                  <span>${highlight}</span>
+                </div>`
+              ).join('')}
+            </div>
+          </div>
+        `
+      }
+
+      // Add daily itinerary
+      structuredContent += `<h2 style="font-size: 20px; font-weight: bold; margin-bottom: 20px; color: #1f2937;">📋 Your Daily Adventure</h2>`
+      
+      currentTrip.itinerary?.forEach((day, index) => {
+        structuredContent += `
+          <div class="day-section">
+            <div class="day-header gradient-bg">
+              Day ${day.day} - ${formatDate(day.date)}
+              ${day.temperature ? `<span style="float: right;">${getWeatherIcon(day.condition)} ${day.temperature}°C</span>` : ''}
+            </div>
+        `
+
+        // Morning
+        if (day.morning) {
+          structuredContent += `
+            <div class="activity-block activity-morning">
+              <div class="activity-title">🌅 Morning: ${day.morning.activity}</div>
+              <div class="activity-meta">
+                <span>📍 ${day.morning.location}</span>
+                <span>⏱️ ${day.morning.duration}</span>
+                <span>💰 ${day.morning.cost}</span>
+              </div>
+              <div class="activity-description">${day.morning.description}</div>
+            </div>
+          `
+        }
+
+        // Afternoon
+        if (day.afternoon) {
+          structuredContent += `
+            <div class="activity-block activity-afternoon">
+              <div class="activity-title">☀️ Afternoon: ${day.afternoon.activity}</div>
+              <div class="activity-meta">
+                <span>📍 ${day.afternoon.location}</span>
+                <span>⏱️ ${day.afternoon.duration}</span>
+                <span>💰 ${day.afternoon.cost}</span>
+              </div>
+              <div class="activity-description">${day.afternoon.description}</div>
+            </div>
+          `
+        }
+
+        // Evening
+        if (day.evening) {
+          structuredContent += `
+            <div class="activity-block activity-evening">
+              <div class="activity-title">🌆 Evening: ${day.evening.activity}</div>
+              <div class="activity-meta">
+                <span>📍 ${day.evening.location}</span>
+                <span>⏱️ ${day.evening.duration}</span>
+                <span>💰 ${day.evening.cost}</span>
+              </div>
+              <div class="activity-description">${day.evening.description}</div>
+            </div>
+          `
+        }
+
+        structuredContent += `</div>`
+      })
+
+      // Add tips section
+      if (currentTrip.tips) {
+        structuredContent += `
+          <div class="tips-section tip-card break-inside-avoid">
+            <div class="tips-title">💡 Essential Travel Tips</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+        `
+
+        if (currentTrip.tips.transportation) {
+          structuredContent += `
+            <div class="tip-item">
+              <h4>🚗 Getting Around</h4>
+              <p style="font-size: 13px; line-height: 1.4;">${currentTrip.tips.transportation}</p>
+            </div>
+          `
+        }
+
+        if (currentTrip.tips.budget) {
+          structuredContent += `
+            <div class="tip-item">
+              <h4>💰 Money Matters</h4>
+              <ul class="tip-list">
+                ${currentTrip.tips.budget.map(tip => `<li>${tip}</li>`).join('')}
+              </ul>
+            </div>
+          `
+        }
+
+        if (currentTrip.tips.packing) {
+          structuredContent += `
+            <div class="tip-item">
+              <h4>🎒 Pack Smart</h4>
+              <ul class="tip-list">
+                ${currentTrip.tips.packing.map(item => `<li>${item}</li>`).join('')}
+              </ul>
+            </div>
+          `
+        }
+
+        structuredContent += `</div></div>`
+      }
+
+      // Add footer
+      structuredContent += `
+        <div class="footer">
+          <p>🤖 AI-Generated Itinerary</p>
+          <p>Created on ${new Date(currentTrip.generatedOn).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</p>
+        </div>
+      `
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${currentTrip.destination} Itinerary</title>
+          <meta charset="utf-8">
+          ${printStyles}
+        </head>
+        <body>
+          ${structuredContent}
+          <script>
+            window.onload = function() {
+              setTimeout(() => {
+                window.print();
+                setTimeout(() => window.close(), 1000);
+              }, 500);
+            }
+          </script>
+        </body>
+        </html>
+      `)
+      printWindow.document.close()
+    } catch (error) {
+      console.error('Export failed:', error)
+      alert('Export failed. Please try again.')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  // Export to HTML/DOC function
+  const exportToDoc = () => {
+    try {
+      const element = document.getElementById('itinerary-content')
+      
+      // Create a complete HTML document
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${currentTrip.destination} Itinerary</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              max-width: 800px;
+              margin: 0 auto;
+              padding: 20px;
+              color: #333;
+            }
+            h1, h2, h3 { color: #2563eb; }
+            .day-header { 
+              background: linear-gradient(to right, #4f46e5, #7c3aed);
+              color: white;
+              padding: 15px;
+              border-radius: 10px;
+              margin: 20px 0 10px 0;
+            }
+            .activity-section { 
+              margin: 15px 0;
+              padding: 15px;
+              border-left: 4px solid #e5e7eb;
+              background: #f9fafb;
+            }
+            .highlight { 
+              background: #fef3c7;
+              padding: 10px;
+              border-radius: 5px;
+              margin: 5px 0;
+            }
+            .tip-section {
+              background: #f0f9ff;
+              padding: 15px;
+              border-radius: 10px;
+              margin: 15px 0;
+            }
+          </style>
+        </head>
+        <body>
+          ${element.innerHTML}
+        </body>
+        </html>
+      `
+      
+      const blob = new Blob([htmlContent], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${currentTrip.destination.replace(/[^a-z0-9]/gi, '_')}-itinerary.doc`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('DOC export failed:', error)
+      alert('Export failed. Please try again.')
+    }
+  }
+
+  // Alternative: Export as plain text
+  const exportAsText = () => {
+    try {
+      let textContent = `${currentTrip.destination.toUpperCase()} ITINERARY\n`
+      textContent += `${'='.repeat(50)}\n\n`
+      textContent += `Destination: ${currentTrip.destination}\n`
+      textContent += `Duration: ${currentTrip.duration} days\n`
+      textContent += `Start Date: ${formatDate(currentTrip.startDate)}\n`
+      textContent += `Budget: ${currentTrip.budget}\n`
+      textContent += `Group Type: ${currentTrip.groupType}\n\n`
+
+      if (currentTrip.summary?.description) {
+        textContent += `DESCRIPTION:\n${currentTrip.summary.description}\n\n`
+      }
+
+      if (currentTrip.summary?.highlights) {
+        textContent += `HIGHLIGHTS:\n`
+        currentTrip.summary.highlights.forEach((highlight, index) => {
+          textContent += `${index + 1}. ${highlight}\n`
+        })
+        textContent += '\n'
+      }
+
+      textContent += `DAILY ITINERARY:\n${'='.repeat(30)}\n\n`
+
+      currentTrip.itinerary?.forEach((day, index) => {
+        textContent += `DAY ${day.day} - ${formatDate(day.date)}\n`
+        textContent += `${'-'.repeat(40)}\n`
+
+        if (day.morning) {
+          textContent += `MORNING: ${day.morning.activity}\n`
+          textContent += `Location: ${day.morning.location}\n`
+          textContent += `Duration: ${day.morning.duration}\n`
+          textContent += `Cost: ${day.morning.cost}\n`
+          textContent += `${day.morning.description}\n\n`
+        }
+
+        if (day.afternoon) {
+          textContent += `AFTERNOON: ${day.afternoon.activity}\n`
+          textContent += `Location: ${day.afternoon.location}\n`
+          textContent += `Duration: ${day.afternoon.duration}\n`
+          textContent += `Cost: ${day.afternoon.cost}\n`
+          textContent += `${day.afternoon.description}\n\n`
+        }
+
+        if (day.evening) {
+          textContent += `EVENING: ${day.evening.activity}\n`
+          textContent += `Location: ${day.evening.location}\n`
+          textContent += `Duration: ${day.evening.duration}\n`
+          textContent += `Cost: ${day.evening.cost}\n`
+          textContent += `${day.evening.description}\n\n`
+        }
+      })
+
+      if (currentTrip.tips) {
+        textContent += `TRAVEL TIPS:\n${'='.repeat(20)}\n\n`
+        
+        if (currentTrip.tips.transportation) {
+          textContent += `Transportation: ${currentTrip.tips.transportation}\n\n`
+        }
+        
+        if (currentTrip.tips.budget) {
+          textContent += `Budget Tips:\n`
+          currentTrip.tips.budget.forEach(tip => {
+            textContent += `- ${tip}\n`
+          })
+          textContent += '\n'
+        }
+        
+        if (currentTrip.tips.packing) {
+          textContent += `Packing List:\n`
+          currentTrip.tips.packing.forEach(item => {
+            textContent += `- ${item}\n`
+          })
+        }
+      }
+
+      const blob = new Blob([textContent], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${currentTrip.destination.replace(/[^a-z0-9]/gi, '_')}-itinerary.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Text export failed:', error)
+      alert('Export failed. Please try again.')
+    }
+  }
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-700">Generating Your Perfect Itinerary...</h2>
-          <p className="text-gray-500 mt-2">This may take a few moments</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white rounded-2xl p-12 shadow-xl text-center max-w-md">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-200 border-t-blue-600 mx-auto mb-6"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl">✈️</span>
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Crafting Your Perfect Journey</h2>
+          <p className="text-gray-600">Our AI is working its magic to create your personalized itinerary...</p>
+          <div className="mt-4 flex justify-center space-x-1">
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+          </div>
         </div>
       </div>
     )
@@ -20,28 +611,22 @@ const Itinerary = () => {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 shadow-xl max-w-md w-full">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error generating itinerary</h3>
-              <p className="mt-1 text-sm text-red-700">{error}</p>
-            </div>
-            <div className="ml-auto">
-              <button
-                onClick={clearError}
-                className="text-red-400 hover:text-red-600 transition-colors"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Oops! Something went wrong</h3>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <button
+              onClick={clearError}
+              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </div>
@@ -50,22 +635,38 @@ const Itinerary = () => {
 
   if (!currentTrip) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="text-center py-20">
-          <div className="text-6xl mb-4">🗺️</div>
-          <h2 className="text-2xl font-semibold text-gray-700 mb-2">No itinerary generated yet</h2>
-          <p className="text-gray-500">Create a trip to see your personalized itinerary here</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-8xl mb-6">🗺️</div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Ready for Your Next Adventure?</h2>
+          <p className="text-gray-600 text-lg mb-8">Create a trip to see your personalized itinerary here</p>
+          <div className="bg-white rounded-xl p-6 shadow-lg">
+            <p className="text-sm text-gray-500">💡 Tip: Fill out the trip form to generate an amazing itinerary tailored just for you!</p>
+          </div>
         </div>
       </div>
     )
   }
 
   const handleSaveTrip = async () => {
-    const success = await saveTrip(currentTrip)
-    if (success) {
-      alert('Trip saved successfully!')
-    } else {
-      alert('Failed to save trip. Please try again.')
+    if (!user) {
+      alert('Please log in to save your trip!')
+      return
+    }
+
+    setSaveLoading(true)
+    try {
+      const success = await saveTrip(currentTrip)
+      if (success) {
+        alert('🎉 Trip saved successfully!')
+        navigate('/my-trips')
+      } else {
+        alert('❌ Failed to save trip. Please try again.')
+      }
+    } catch (error) {
+      alert('❌ Failed to save trip. Please try again.')
+    } finally {
+      setSaveLoading(false)
     }
   }
 
@@ -89,221 +690,322 @@ const Itinerary = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white p-8">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">{currentTrip.summary?.title || `Trip to ${currentTrip.destination}`}</h1>
-            <p className="text-blue-100 mb-4">
-              {currentTrip.summary?.description || `${currentTrip.duration} days in ${currentTrip.destination}`}
-            </p>
-            <div className="flex flex-wrap gap-4 text-sm">
-              <span className="bg-white/20 px-3 py-1 rounded-full">📅 {formatDate(currentTrip.startDate)}</span>
-              <span className="bg-white/20 px-3 py-1 rounded-full">⏱️ {currentTrip.duration} days</span>
-              <span className="bg-white/20 px-3 py-1 rounded-full">💰 {currentTrip.budget}</span>
-              <span className="bg-white/20 px-3 py-1 rounded-full">👥 {currentTrip.groupType}</span>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-8" id="itinerary-content">
+        {/* Enhanced Header Section */}
+        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl text-white p-8 md:p-10 shadow-2xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="relative z-10">
+            <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-4xl">✈️</span>
+                  <h1 className="text-3xl md:text-4xl font-bold">
+                    {currentTrip.summary?.title || `Journey to ${currentTrip.destination}`}
+                  </h1>
+                </div>
+                <p className="text-blue-100 mb-6 text-lg leading-relaxed">
+                  {currentTrip.summary?.description || `Discover ${currentTrip.destination} in ${currentTrip.duration} incredible days`}
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full flex items-center gap-2">
+                    <span>📅</span>
+                    <span className="font-medium">{formatDate(currentTrip.startDate)}</span>
+                  </div>
+                  <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full flex items-center gap-2">
+                    <span>⏱️</span>
+                    <span className="font-medium">{currentTrip.duration} days</span>
+                  </div>
+                  <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full flex items-center gap-2">
+                    <span>💰</span>
+                    <span className="font-medium">{currentTrip.budget}</span>
+                  </div>
+                  <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full flex items-center gap-2">
+                    <span>👥</span>
+                    <span className="font-medium capitalize">{currentTrip.groupType}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-3 no-print">
+  {/* Regenerate Button */}
+  <button
+    onClick={handleRegenerateItinerary}
+    className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl text-center"
+  >
+    <p className="text-center">🔄 Regenerate Itinerary</p>
+  </button>
+
+  {/* Save Button */}
+  {user ? (
+    <button
+      onClick={handleSaveTrip}
+      disabled={saveLoading}
+      className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 text-center"
+    >
+      {saveLoading ? (
+        <>
+          <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full "></div>
+          Saving...
+        </>
+      ) : (
+        <>
+          <p className="text-center">💾 Save Trip</p>
+        </>
+      )}
+    </button>
+  ) : (
+    <div className="bg-white/20 backdrop-blur-sm px-6 py-3 rounded-xl text-center">
+      <p className="text-sm">🔐 Log in to save trips</p>
+    </div>
+  )}
+                
+                {/* Export Options */}
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={exportToPDF}
+                    disabled={exportLoading}
+                    className="bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-all duration-200 text-sm font-medium flex items-center gap-1"
+                  >
+                    {exportLoading ? '⏳' : '📄'} PDF
+                  </button>
+                  <button
+                    onClick={exportToDoc}
+                    className="bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-all duration-200 text-sm font-medium flex items-center gap-1"
+                  >
+                    📝 DOC
+                  </button>
+                  <button
+                    onClick={exportAsText}
+                    className="bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-all duration-200 text-sm font-medium flex items-center gap-1"
+                  >
+                    📋 TXT
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-          {user && (
-            <button
-              onClick={handleSaveTrip}
-              className="bg-white text-blue-600 px-6 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
-            >
-              Save Trip
-            </button>
-          )}
-        </div>
-      </div>
+        </div> 
 
-      {/* Weather Overview */}
-      {currentTrip.weather && (
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            🌤️ Weather in {currentTrip.weather.location}
+        {/* Trip Highlights */}
+        {currentTrip.summary?.highlights && (
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 break-inside-avoid">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+              ✨ Trip Highlights
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {currentTrip.summary.highlights.map((highlight, index) => (
+                <div key={index} className="flex items-center p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-200">
+                  <span className="text-2xl mr-3">⭐</span>
+                  <span className="text-gray-700 font-medium">{highlight}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Daily Itinerary */}
+        <div className="space-y-8">
+          <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
+            📋 Your Daily Adventure
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {currentTrip.weather.forecast?.slice(0, 5).map((day, index) => (
-              <div key={index} className="text-center p-3 bg-gray-50 rounded-lg">
-                <div className="text-2xl mb-1">{getWeatherIcon(day.condition)}</div>
-                <div className="text-sm text-gray-600">Day {index + 1}</div>
-                <div className="font-semibold">{day.temperature}°C</div>
-                <div className="text-xs text-gray-500 capitalize">{day.description}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Trip Highlights */}
-      {currentTrip.summary?.highlights && (
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <h2 className="text-xl font-semibold mb-4">✨ Trip Highlights</h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            {currentTrip.summary.highlights.map((highlight, index) => (
-              <div key={index} className="flex items-center p-3 bg-yellow-50 rounded-lg">
-                <span className="text-yellow-500 mr-3">⭐</span>
-                <span className="text-gray-700">{highlight}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Daily Itinerary */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-800">📋 Daily Itinerary</h2>
-        
-        {currentTrip.itinerary?.map((day, index) => (
-          <div key={index} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            {/* Day Header */}
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 border-b">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-800">
-                    Day {day.day} - {formatDate(day.date)}
-                  </h3>
-                </div>
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <span className="flex items-center">
-                    {getWeatherIcon(day.condition)}
-                    <span className="ml-1">{day.temperature}°C</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Time Periods */}
-            <div className="divide-y">
-              {/* Morning */}
-              {day.morning && (
-                <div className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-shrink-0 w-20 text-center">
-                      <div className="text-2xl mb-1">🌅</div>
-                      <div className="text-sm font-medium text-gray-600">Morning</div>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-lg text-gray-800 mb-2">{day.morning.activity}</h4>
-                      <div className="space-y-2 text-sm text-gray-600">
-                        <p><span className="font-medium">📍 Location:</span> {day.morning.location}</p>
-                        <p><span className="font-medium">⏱️ Duration:</span> {day.morning.duration}</p>
-                        <p><span className="font-medium">💰 Cost:</span> {day.morning.cost}</p>
-                        <p className="text-gray-700">{day.morning.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Afternoon */}
-              {day.afternoon && (
-                <div className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-shrink-0 w-20 text-center">
-                      <div className="text-2xl mb-1">☀️</div>
-                      <div className="text-sm font-medium text-gray-600">Afternoon</div>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-lg text-gray-800 mb-2">{day.afternoon.activity}</h4>
-                      <div className="space-y-2 text-sm text-gray-600">
-                        <p><span className="font-medium">📍 Location:</span> {day.afternoon.location}</p>
-                        <p><span className="font-medium">⏱️ Duration:</span> {day.afternoon.duration}</p>
-                        <p><span className="font-medium">💰 Cost:</span> {day.afternoon.cost}</p>
-                        <p className="text-gray-700">{day.afternoon.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Evening */}
-              {day.evening && (
-                <div className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-shrink-0 w-20 text-center">
-                      <div className="text-2xl mb-1">🌆</div>
-                      <div className="text-sm font-medium text-gray-600">Evening</div>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-lg text-gray-800 mb-2">{day.evening.activity}</h4>
-                      <div className="space-y-2 text-sm text-gray-600">
-                        <p><span className="font-medium">📍 Location:</span> {day.evening.location}</p>
-                        <p><span className="font-medium">⏱️ Duration:</span> {day.evening.duration}</p>
-                        <p><span className="font-medium">💰 Cost:</span> {day.evening.cost}</p>
-                        <p className="text-gray-700">{day.evening.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Tips Section */}
-      {currentTrip.tips && (
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <h2 className="text-xl font-semibold mb-6">💡 Travel Tips</h2>
           
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Transportation */}
-            {currentTrip.tips.transportation && (
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-                  🚗 Transportation
-                </h3>
-                <p className="text-gray-600 text-sm">{currentTrip.tips.transportation}</p>
+          {currentTrip.itinerary?.map((day, index) => (
+            <div key={index} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300 break-inside-avoid">
+              {/* Enhanced Day Header */}
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2">
+                      Day {day.day}
+                    </h3>
+                    <p className="text-indigo-100">{formatDate(day.date)}</p>
+                  </div>
+                  {day.temperature && (
+                    <div className="text-right">
+                      <div className="flex items-center justify-end gap-2 text-lg">
+                        {getWeatherIcon(day.condition)}
+                        <span className="text-2xl font-bold">{day.temperature}°C</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
 
-            {/* Budget Tips */}
-            {currentTrip.tips.budget && (
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-                  💰 Budget Tips
-                </h3>
-                <ul className="space-y-1">
-                  {currentTrip.tips.budget.map((tip, index) => (
-                    <li key={index} className="text-gray-600 text-sm flex items-start">
-                      <span className="text-green-500 mr-2 mt-0.5">•</span>
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+              {/* Enhanced Time Periods */}
+              <div className="divide-y divide-gray-100">
+                {/* Morning */}
+                {day.morning && (
+                  <div className="p-6 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start gap-6">
+                      <div className="flex-shrink-0 text-center">
+                        <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-2xl mb-2">
+                          🌅
+                        </div>
+                        <div className="text-sm font-semibold text-gray-600">Morning</div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-xl text-gray-800 mb-3">{day.morning.activity}</h4>
+                        <div className="grid md:grid-cols-3 gap-4 mb-4">
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">📍</span>
+                            <span className="font-medium">{day.morning.location}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">⏱️</span>
+                            <span className="font-medium">{day.morning.duration}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">💰</span>
+                            <span className="font-medium">{day.morning.cost}</span>
+                          </div>
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">{day.morning.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-            {/* Packing */}
-            {currentTrip.tips.packing && (
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-                  🎒 Packing List
-                </h3>
-                <ul className="space-y-1">
-                  {currentTrip.tips.packing.map((item, index) => (
-                    <li key={index} className="text-gray-600 text-sm flex items-start">
-                      <span className="text-blue-500 mr-2 mt-0.5">•</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                {/* Afternoon */}
+                {day.afternoon && (
+                  <div className="p-6 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start gap-6">
+                      <div className="flex-shrink-0 text-center">
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full flex items-center justify-center text-2xl mb-2">
+                          ☀️
+                        </div>
+                        <div className="text-sm font-semibold text-gray-600">Afternoon</div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-xl text-gray-800 mb-3">{day.afternoon.activity}</h4>
+                        <div className="grid md:grid-cols-3 gap-4 mb-4">
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">📍</span>
+                            <span className="font-medium">{day.afternoon.location}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">⏱️</span>
+                            <span className="font-medium">{day.afternoon.duration}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">💰</span>
+                            <span className="font-medium">{day.afternoon.cost}</span>
+                          </div>
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">{day.afternoon.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Evening */}
+                {day.evening && (
+                  <div className="p-6 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start gap-6">
+                      <div className="flex-shrink-0 text-center">
+                        <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-2xl mb-2">
+                          🌆
+                        </div>
+                        <div className="text-sm font-semibold text-gray-600">Evening</div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-xl text-gray-800 mb-3">{day.evening.activity}</h4>
+                        <div className="grid md:grid-cols-3 gap-4 mb-4">
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">📍</span>
+                            <span className="font-medium">{day.evening.location}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">⏱️</span>
+                            <span className="font-medium">{day.evening.duration}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="text-lg">💰</span>
+                            <span className="font-medium">{day.evening.cost}</span>
+                          </div>
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">{day.evening.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          ))}
         </div>
-      )}
 
-      {/* Trip Metadata */}
-      <div className="bg-gray-50 rounded-xl p-4 text-center text-sm text-gray-500">
-        Generated on {new Date(currentTrip.generatedOn).toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })}
+        {/* Enhanced Tips Section */}
+        {currentTrip.tips && (
+          <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
+            <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
+              💡 Essential Travel Tips
+            </h2>
+            
+            <div className="grid lg:grid-cols-3 gap-8">
+              {/* Transportation */}
+              {currentTrip.tips.transportation && (
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200">
+                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
+                    🚗 Getting Around
+                  </h3>
+                  <p className="text-gray-700 leading-relaxed">{currentTrip.tips.transportation}</p>
+                </div>
+              )}
+
+              {/* Budget Tips */}
+              {currentTrip.tips.budget && (
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-6 rounded-xl border border-blue-200">
+                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
+                    💰 Money Matters
+                  </h3>
+                  <ul className="space-y-3">
+                    {currentTrip.tips.budget.map((tip, index) => (
+                      <li key={index} className="text-gray-700 flex items-start gap-3">
+                        <span className="text-green-500 mt-1 text-sm font-bold">✓</span>
+                        <span className="leading-relaxed">{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Packing */}
+              {currentTrip.tips.packing && (
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-200">
+                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
+                    🎒 Pack Smart
+                  </h3>
+                  <ul className="space-y-3">
+                    {currentTrip.tips.packing.map((item, index) => (
+                      <li key={index} className="text-gray-700 flex items-start gap-3">
+                        <span className="text-purple-500 mt-1 text-sm font-bold">•</span>
+                        <span className="leading-relaxed">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Trip Metadata */}
+        <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-2xl p-6 text-center text-white">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-lg">🤖</span>
+            <span className="font-semibold">AI-Generated Itinerary</span>
+          </div>
+          <p className="text-gray-300 text-sm">
+            Created on {new Date(currentTrip.generatedOn).toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </p>
+        </div>
       </div>
     </div>
   )
