@@ -62,7 +62,7 @@ const TripPlanner = () => {
 
   const getMaxDate = () => {
     const maxDate = new Date()
-    maxDate.setDate(maxDate.getDate() + 10)
+    maxDate.setDate(maxDate.getDate() + 5)
     return maxDate.toISOString().split('T')[0]
   }
 
@@ -100,7 +100,7 @@ const TripPlanner = () => {
       alertMessages.push('Trip duration is required (minimum 1 day)')
     } else if (duration > 10) {
       newErrors.duration = 'Maximum trip duration is 10 days (weather forecast limit)'
-      alertMessages.push('Trip duration cannot exceed 10 days')
+      alertMessages.push('Trip duration cannot exceed 10 days from current day')
     }
     
     if (!tripForm.preferences.trim()) {
@@ -219,20 +219,6 @@ const TripPlanner = () => {
       />
 
       {/* Header */}
-      {/* <header className="bg-white/80 backdrop-blur-sm border-b border-white/20 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Home
-          </button>
-        </div>
-
-
-      </header> */}
-
       <header className="bg-white/80 backdrop-blur-sm border-b border-white/20 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -322,7 +308,7 @@ const TripPlanner = () => {
           <div>
             <h3 className="font-medium text-blue-800">Weather Forecast Information</h3>
             <p className="text-blue-700 text-sm mt-1">
-              Our weather integration provides accurate forecasts for trips up to 10 days, starting from tomorrow onwards. 
+              Our weather integration provides accurate forecasts for trips up to 10 days, starting from tomorrow onwards.  
               Plan your trip within this timeframe for the most reliable weather-optimized recommendations.
             </p>
           </div>
