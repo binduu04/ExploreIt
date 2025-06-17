@@ -1,40 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ArrowLeft,
-  Plus,
-  MapPin,
-  Calendar,
-  Trash2,
-  Eye,
-  Heart,
-  User,
-  LogOut,
-  Search,
-  Filter,
-  Grid,
-  List,
-  Globe,
-  Star,
-  Clock,
-  DollarSign,
-  Share2,
-  Bookmark,
-  Plane,
-  SortAsc,
-  SortDesc,
-  MoreVertical,
-  Edit,
-  Copy,
-  Archive,
-  MessageCircle,
-  Mail,
-  Send,
-  X,
+import {ArrowLeft,Plus,MapPin,Calendar,Trash2,Eye,Heart,User,LogOut,Search,Filter,Grid,List,Globe,Star,Clock,DollarSign,Share2,Bookmark,Plane,SortAsc,SortDesc,MoreVertical,Edit,Copy,Archive,MessageCircle,Mail,Send,X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTrip } from "../context/TripContext";
 import TripChatPanel, { TripChatButton } from "../components/TripChatPanel";
+import EmailModal from "../components/EmailModal"; // Import the EmailModal component
 
 const SavedTrips = () => {
   const navigate = useNavigate();
@@ -52,9 +23,8 @@ const SavedTrips = () => {
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedTripForChat, setSelectedTripForChat] = useState(null);
 
-  const [emailModal, setEmailModal] = useState({ show: false, trip: null });
-  const [emailForm, setEmailForm] = useState({ email: "", message: "" });
-  const [emailLoading, setEmailLoading] = useState(false);
+  // Simplified email modal state - only need to track if it's open and which trip
+  const [emailModal, setEmailModal] = useState({ isOpen: false, trip: null });
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -63,46 +33,11 @@ const SavedTrips = () => {
   }, [isLoggedIn, navigate]);
 
   const handleSendEmail = async (trip) => {
-    setEmailModal({ show: true, trip });
-    setEmailForm({ email: "", message: "" });
+    setEmailModal({ isOpen: true, trip });
   };
 
-  const handleEmailSubmit = async (e) => {
-    e.preventDefault();
-    setEmailLoading(true);
-
-    try {
-      const response = await fetch(
-        "http://localhost:5000/api/send-trip-email",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            tripData: emailModal.trip,
-            recipientEmail: emailForm.email,
-            senderName: user?.displayName || user?.email || "ExploreIt User",
-            senderMessage: emailForm.message,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert("Trip details sent successfully!");
-        setEmailModal({ show: false, trip: null });
-        setEmailForm({ email: "", message: "" });
-      } else {
-        alert(result.message || "Failed to send email");
-      }
-    } catch (error) {
-      console.error("Email sending failed:", error);
-      alert("Failed to send email. Please check your connection.");
-    } finally {
-      setEmailLoading(false);
-    }
+  const handleCloseEmailModal = () => {
+    setEmailModal({ isOpen: false, trip: null });
   };
 
   const handleOpenChat = (trip) => {
@@ -554,22 +489,22 @@ const SavedTrips = () => {
                         </div>
                       </div>
 
-                      <div className="p-8 pt-0 flex items-center justify-between">
+                      <div className="p-4 pt-0 flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <button
                             onClick={() => handleViewTrip(trip)}
-                            className="flex items-center px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 font-medium shadow-md shadow-indigo-500/20 hover:scale-105 text-sm"
+                            className="flex items-center px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 font-medium shadow-md shadow-indigo-500/20 text-sm"
                           >
                             <Eye className="w-4 h-4 mr-2" />
-                            View Trip
+                            View
                           </button>
                           <TripChatButton trip={trip} onOpenChat={handleOpenChat} />
                           <button
                             onClick={() => handleSendEmail(trip)}
-                            className="flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-medium shadow-md shadow-green-500/20 hover:scale-105 text-sm"
+                            className="p-3 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-2xl transition-all duration-200"
+                            title="Send via email"
                           >
-                            <Mail className="w-4 h-4 mr-2" />
-                            Email
+                            <Mail className="w-4 h-4" />
                           </button>
                         </div>
 
@@ -606,7 +541,7 @@ const SavedTrips = () => {
                           <h3 className="text-xl font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">
                             {trip.destination}
                           </h3>
-                          <div className="absolute top-2 right-4 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                          <div className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
                             {getRelativeTime(trip.savedOn)}
                           </div>
                         </div>
@@ -681,92 +616,13 @@ const SavedTrips = () => {
         />
       )}
 
-      {emailModal.show && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-800">
-                Send Trip via Email
-              </h3>
-              <button
-                onClick={() => setEmailModal({ show: false, trip: null })}
-                className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100">
-              <h4 className="font-semibold text-indigo-800 mb-2">
-                {emailModal.trip?.destination}
-              </h4>
-              <p className="text-sm text-indigo-600">
-                {emailModal.trip?.duration}{" "}
-                {emailModal.trip?.duration === 1 ? "day" : "days"} •
-                {emailModal.trip?.budget && ` ${emailModal.trip.budget} budget`}
-              </p>
-            </div>
-
-            <form onSubmit={handleEmailSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Recipient Email *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={emailForm.email}
-                  onChange={(e) =>
-                    setEmailForm((prev) => ({ ...prev, email: e.target.value }))
-                  }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors"
-                  placeholder="friend@example.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Personal Message (Optional)
-                </label>
-                <textarea
-                  value={emailForm.message}
-                  onChange={(e) =>
-                    setEmailForm((prev) => ({
-                      ...prev,
-                      message: e.target.value,
-                    }))
-                  }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors resize-none"
-                  rows={3}
-                  placeholder="Hey! Check out this amazing trip plan I created..."
-                />
-              </div>
-
-              <div className="flex items-center space-x-4 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setEmailModal({ show: false, trip: null })}
-                  className="flex-1 px-6 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={emailLoading}
-                  className="flex-1 flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-medium disabled:opacity-50"
-                >
-                  {emailLoading ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  ) : (
-                    <Send className="w-4 h-4 mr-2" />
-                  )}
-                  {emailLoading ? "Sending..." : "Send Email"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Use the external EmailModal component */}
+      <EmailModal
+        isOpen={emailModal.isOpen}
+        trip={emailModal.trip}
+        onClose={handleCloseEmailModal}
+        user={user}
+      />
     </div>
   );
 };
