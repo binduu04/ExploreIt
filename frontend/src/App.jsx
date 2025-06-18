@@ -7,6 +7,7 @@ import Landing from './pages/Landing'
 import TripPlanner from './pages/TripPlanner'
 import Itinerary from './pages/Itinerary'
 import SavedTrips from './pages/SavedTrips'
+import ViewTrip from './pages/ViewTrip'
 import './App.css'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
               <Route path="/plan" element={<TripPlanner />} />
               <Route path="/itinerary" element={<Itinerary />} />
               <Route path="/my-trips" element={<SavedTrips />} />
+              <Route path="/viewtrip" element={<ViewTrip />} />
             </Routes>
           </div>
         </Router>

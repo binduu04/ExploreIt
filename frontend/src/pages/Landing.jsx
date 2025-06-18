@@ -219,7 +219,7 @@ const Landing = () => {
                       <Globe className="w-6 h-6 text-white" />
                       <span className="font-semibold">Europe Backpack</span>
                     </div>
-                    <p className="text-sm text-purple-100">14 days • 6 countries</p>
+                    <p className="text-sm text-purple-100">8 days • 8 iconic places</p>
                     <div className="mt-3 text-sm text-purple-100">
                       Generated in 30 seconds ⚡
                     </div>
@@ -274,6 +274,65 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-white/10 bg-black/50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Main Footer Content */}
+          <div className="flex flex-col md:flex-row justify-between items-center space-y-6 md:space-y-0">
+            {/* Brand */}
+            <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-8">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                  <Compass className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-2xl font-bold">ExploreIt</span>
+              </div>
+              <p className="text-gray-400 text-sm text-center md:text-left">
+                AI-powered travel planning for unforgettable adventures
+              </p>
+            </div>
+
+            {/* Social Links */}
+            <div className="flex items-center space-x-6">
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <span className="sr-only">Twitter</span>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" />
+                </svg>
+              </a>
+             <a href="mailto:donatewell1@gmail.com" className="text-gray-400 hover:text-white transition-colors">
+                <span className="sr-only">Email</span>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M1.5 8.67v8.58a3 3 0 003 3h15a3 3 0 003-3V8.67l-8.928 5.493a3 3 0 01-3.144 0L1.5 8.67z" />
+                  <path d="M22.5 6.908V6.75a3 3 0 00-3-3h-15a3 3 0 00-3 3v.158l9.714 5.978a1.5 1.5 0 001.572 0L22.5 6.908z" />
+                </svg>
+              </a>
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <span className="sr-only">LinkedIn</span>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="mt-8 pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between items-center space-y-3 md:space-y-0">
+            <p className="text-gray-400 text-sm">
+              © 2025 ExploreIt. All rights reserved.
+            </p>
+            <div className="flex items-center space-x-4 text-sm">
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">Privacy</a>
+              <span className="text-gray-600">•</span>
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">Terms</a>
+              <span className="text-gray-600">•</span>
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">Contact</a>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* Login Modal */}
       <LoginModal

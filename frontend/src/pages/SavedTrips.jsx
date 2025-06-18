@@ -64,7 +64,7 @@ const SavedTrips = () => {
 
   const handleViewTrip = (trip) => {
     setCurrentTrip(trip);
-    navigate("/itinerary");
+    navigate("/viewtrip");
   };
 
   const handleLogout = async () => {

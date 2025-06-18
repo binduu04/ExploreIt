@@ -330,7 +330,7 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
         </div>
 
         {/* Trip Context Card */}
-        {trip && (
+        {/* {trip && (
           <div className={`p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b flex-shrink-0 ${
             isFullscreen ? 'px-8' : ''
           }`}>
@@ -354,6 +354,41 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
                   <span className="text-sm leading-relaxed">
                     {trip.preferences.length > 80 
                       ? `${trip.preferences.substring(0, 80)}...` 
+                      : trip.preferences
+                    }
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )} */}
+
+        {/* Trip Context Card - Compact Version */}
+        {trip && (
+          <div className={`px-3 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 border-b flex-shrink-0 ${
+            isFullscreen ? 'px-6' : ''
+          }`}>
+            <div className="bg-white rounded-lg p-3 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-gray-800 text-sm truncate flex-1 mr-3 capitalize">{trip.destination}</h4>
+                <div className="flex items-center text-xs text-gray-600 flex-shrink-0">
+                  <Calendar className="w-3 h-3 mr-1 text-indigo-500" />
+                  <span>{trip.duration}d</span>
+                  {trip.budget && (
+                    <>
+                      <DollarSign className="w-3 h-3 ml-2 mr-1 text-green-500" />
+                      <span className="capitalize">{trip.budget}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {trip.preferences && (
+                <div className="flex items-start text-gray-600">
+                  <Heart className="w-3 h-3 mr-2 text-pink-500 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs leading-tight line-clamp-2">
+                    {trip.preferences.length > 60 
+                      ? `${trip.preferences.substring(0, 60)}...` 
                       : trip.preferences
                     }
                   </span>
@@ -432,7 +467,7 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
 
         {/* Input Area */}
         <div className={`border-t bg-gray-50 flex-shrink-0 ${
-          isFullscreen ? 'p-8 rounded-b-2xl' : 'p-4'
+          isFullscreen ? 'p-6 rounded-b-2xl' : 'p-4'
         }`}>
           <div className={`${isFullscreen ? 'max-w-4xl mx-auto' : ''}`}>
             <div className="flex items-center space-x-3">
@@ -464,8 +499,6 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
                 {[
                   "Tell me more about day 1",
                   "Best restaurants there?", 
-                  "Weather info",
-                  "Packing tips"
                 ].map((suggestion, index) => (
                   <button
                     key={index}
