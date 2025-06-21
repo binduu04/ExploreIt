@@ -419,11 +419,19 @@ app.post('/api/complete-itinerary', async (req, res) => {
 //   }
 // });
 
+
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, tripId, userId, hybridContext = {} } = req.body;
+    const { 
+      message, 
+      tripId, 
+      userId, 
+      tripContext = {}, 
+      hybridContext = {}, 
+      messageType = "chat" 
+    } = req.body;
     
-    // Validate input
+    // Validate required input
     if (!message || !tripId || !userId) {
       return res.status(400).json({
         error: 'Missing required fields: message, tripId, and userId are required'
@@ -437,102 +445,222 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
-    console.log('💬 Processing chat message for trip:', tripId);
-    
-    // Get trip context
-    const tripContext = req.body.tripContext || {};
+    console.log('💬 Processing chat message:', {
+      messageType,
+      tripId,
+      userId,
+      messageLength: message.length,
+      hasContext: !!tripContext,
+      hasSummary: !!(hybridContext.conversationSummary),
+      recentMessagesCount: hybridContext.recentMessages?.length || 0,
+      totalMessages: hybridContext.totalMessages || 0
+    });
     
     // Extract conversation data from hybridContext
     const conversationSummary = hybridContext.conversationSummary || '';
     const recentMessages = Array.isArray(hybridContext.recentMessages) ? hybridContext.recentMessages : [];
     const totalMessages = hybridContext.totalMessages || 0;
     
-    // Build the prompt with conversation context
+    // Build conversation context string
     let conversationContext = '';
+    
+    // Add summary if it exists
     if (conversationSummary && conversationSummary.trim()) {
-      conversationContext += `\nConversation Summary: ${conversationSummary}\n`;
+      conversationContext += `\nPrevious Conversation Summary:\n${conversationSummary}\n`;
     }
     
+    // Add recent messages if they exist
     if (recentMessages.length > 0) {
-      conversationContext += `\nRecent Messages:\n${JSON.stringify(recentMessages, null, 2)}\n`;
+      conversationContext += `\nRecent Messages:\n`;
+      recentMessages.forEach((msg, index) => {
+        const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+        conversationContext += `${msg.type === "user" ? "User" : "Assistant"} ${timestamp}: ${msg.content}\n`;
+      });
     }
     
-    const prompt = `You are a helpful travel assistant. You have access to the user's trip details and previous conversation history.
+    // Build the appropriate prompt based on message type
+    let prompt;
+    
+    if (messageType === "summary") {
+      // Special prompt for generating summaries
+      prompt = `You are tasked with creating a concise conversation summary for a travel chat.
 
-Trip Context: ${JSON.stringify(tripContext, null, 2)}
+${message}
+
+Please provide a clear, factual summary that captures the key points of the conversation. Focus on:
+- Main travel questions asked
+- Destinations or locations discussed
+- Key recommendations provided
+- Important trip details mentioned
+- Any decisions made or preferences expressed
+
+Keep the summary under 200 words and make it useful for future conversation context.`;
+    } else {
+      // Regular chat prompt
+      prompt = `You are a helpful travel assistant. You have access to the user's trip details and previous conversation history.
+
+Trip Details:
+${JSON.stringify(tripContext, null, 2)}
+
 ${conversationContext}
+
 Total Messages in Conversation: ${totalMessages}
 
-User's New Message: "${message}"
+User's Current Message: "${message}"
 
-Please respond as a knowledgeable travel assistant who:
-1. Remembers our previous conversation (use the summary and recent messages for context)
-2. Provides specific, helpful advice about their trip
-3. References their itinerary, preferences, and trip details when relevant
-4. Offers practical suggestions and tips
+Instructions for your response:
+1. Use the conversation summary and recent messages to maintain context
+2. Provide specific, helpful advice about their trip
+3. Reference their itinerary, preferences, and trip details when relevant
+4. Offer practical suggestions and actionable tips
+5. Keep responses conversational and concise (preferably 3-5 sentences unless more detail is specifically requested)
+6. If the user asks about something not covered in their trip details, provide general helpful travel advice
+7. Be friendly, knowledgeable, and supportive
 
-Respond in a natural, conversational tone. Keep your response concise and specific to the question asked but helpful (preferably 5-lines).`;
+Please provide a helpful response to the user's message.`;
+    }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${GEMINI_API_KEY}`,
+    // Make request to Gemini API
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
           generationConfig: {
             temperature: 0.7,
             topK: 40,
-            topP: 0.9,
-            maxOutputTokens: 4000,
-          }
+            topP: 0.95,
+            maxOutputTokens: messageType === "summary" ? 300 : 500,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
         })
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+    if (!geminiResponse.ok) {
+      const errorData = await geminiResponse.json().catch(() => ({}));
+      console.error('Gemini API error:', errorData);
+      throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorData.error?.message || 'Unknown error'}`);
     }
 
-    const data = await response.json();
-    console.log('🤖 Gemini response structure:', JSON.stringify(data, null, 2));
-
-    // Better validation of response structure
-    if (!data.candidates || 
-        data.candidates.length === 0 || 
-        !data.candidates[0].content || 
-        !data.candidates[0].content.parts || 
-        data.candidates[0].content.parts.length === 0 ||
-        !data.candidates[0].content.parts[0].text) {
-      
-      console.error('Invalid Gemini response structure:', data);
-      throw new Error('Invalid response structure from Gemini API');
+    const geminiData = await geminiResponse.json();
+    
+    // Extract the generated text
+    let generatedText = '';
+    if (geminiData.candidates && geminiData.candidates.length > 0) {
+      const candidate = geminiData.candidates[0];
+      if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+        generatedText = candidate.content.parts[0].text;
+      }
     }
 
-    const aiResponse = data.candidates[0].content.parts[0].text;
+    if (!generatedText) {
+      throw new Error('No response generated from Gemini API');
+    }
 
-    // Return the AI response
+    // Clean up the response
+    generatedText = generatedText.trim();
+
+    console.log('✅ Generated response:', {
+      messageType,
+      responseLength: generatedText.length,
+      tripId,
+      userId
+    });
+
+    // Return the response
     res.json({
-      response: aiResponse,
-      timestamp: new Date().toISOString()
+      message: generatedText,
+      timestamp: new Date().toISOString(),
+      messageType,
+      metadata: {
+        totalMessages,
+        hasConversationSummary: !!conversationSummary,
+        recentMessagesCount: recentMessages.length
+      }
     });
 
   } catch (error) {
-    console.error('❌ Chat API error:', error.message);
+    console.error('Chat endpoint error:', error);
     
-    // Make sure we always return valid JSON
-    res.status(500).json({
-      error: 'Failed to process chat message',
-      details: error.message
-    });
+    // Return appropriate error response
+    if (error.message.includes('Gemini API')) {
+      res.status(502).json({
+        error: 'AI service temporarily unavailable. Please try again.',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    } else {
+      res.status(500).json({
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
   }
 });
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    services: {
+      gemini: !!process.env.GEMINI_API_KEY,
+      database: true // Add your database health check here if applicable
+    }
+  });
+});
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({
+    error: 'Internal server error',
+    details: process.env.NODE_ENV === 'development' ? error.message : undefined
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.originalUrl
+  });
+});
+
+
+
+
+
 
 
 

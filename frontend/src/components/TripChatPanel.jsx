@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import {
   collection,
-  addDoc,
   getDocs,
   query,
   where,
@@ -25,10 +24,10 @@ import {
   doc,
   updateDoc,
   getDoc,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
-import { setDoc } from "firebase/firestore";
 import { sendChatMessage } from "../services/apiService";
 
 const TripChatPanel = ({ trip, isOpen, onClose }) => {
@@ -62,7 +61,6 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
   useEffect(() => {
     if (isOpen && trip && user) {
       loadChatHistory();
-      // Focus input after loading
       setTimeout(() => {
         inputRef.current?.focus();
       }, 300);
@@ -90,15 +88,22 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
     }
   }, [isFullscreen]);
 
+  const getChatId = () => `${user.uid}_${trip.id || trip.firestoreId}`;
+
+  // Generate a unique message ID
+  const generateMessageId = (type) => {
+    return `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
+
   const loadChatHistory = async () => {
     setChatLoading(true);
     try {
-      const chatId = `${user.uid}_${trip.id || trip.firestoreId}`;
+      const chatId = getChatId();
 
       // Load conversation summary first
       await loadConversationSummary(chatId);
 
-      // Simplified query - just use chatId and timestamp
+      // Load chat messages
       const q = query(
         collection(db, "chatHistory"),
         where("chatId", "==", chatId),
@@ -114,7 +119,6 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
         chatHistory.push({
           id: doc.id,
           ...data,
-          // Handle different timestamp formats
           timestamp:
             data.createdAt?.toDate() || new Date(data.timestamp) || new Date(),
         });
@@ -124,27 +128,18 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
         setMessages(chatHistory);
         setMessageCount(chatHistory.length);
       } else {
-        // Initialize with welcome message if no history
         await initializeWelcomeMessage(chatId);
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
-
-      // If it's an index error, fall back to basic query
-      if (error.code === "failed-precondition") {
-        console.log("Index not ready, using fallback query...");
-        await loadChatHistoryFallback();
-      } else {
-        // Fallback to welcome message
-        const chatId = `${user.uid}_${trip.id || trip.firestoreId}`;
-        await initializeWelcomeMessage(chatId);
-      }
+      // Fallback to welcome message
+      const chatId = getChatId();
+      await initializeWelcomeMessage(chatId);
     } finally {
       setChatLoading(false);
     }
   };
 
-  // Fix in your TripChatPanel component
   const loadConversationSummary = async (chatId) => {
     try {
       const summaryDoc = await getDoc(doc(db, "conversationSummaries", chatId));
@@ -152,134 +147,32 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
         const data = summaryDoc.data();
         setConversationSummary(data.summary || "");
       } else {
-        // Document doesn't exist, set empty summary
         setConversationSummary("");
       }
     } catch (error) {
       console.error("Error loading conversation summary:", error);
-      // Set empty summary on error
       setConversationSummary("");
     }
   };
 
-  // Save conversation summary to Firebase
   const saveConversationSummary = async (chatId, summary) => {
     try {
       const summaryRef = doc(db, "conversationSummaries", chatId);
-
-      // Try to update first
-      try {
-        await updateDoc(summaryRef, {
-          summary: summary,
-          lastUpdated: serverTimestamp(),
-          messageCount: messageCount,
-        });
-      } catch (updateError) {
-        // If document doesn't exist, create it using setDoc instead of addDoc
-        await setDoc(summaryRef, {
-          chatId: chatId,
-          summary: summary,
-          lastUpdated: serverTimestamp(),
-          messageCount: messageCount,
-        });
-      }
+      await setDoc(summaryRef, {
+        chatId: chatId,
+        summary: summary,
+        lastUpdated: serverTimestamp(),
+        messageCount: messageCount,
+      }, { merge: true });
     } catch (error) {
       console.error("Error saving conversation summary:", error);
     }
   };
 
-  // Generate conversation summary using AI
-  const generateConversationSummary = async (
-    messages,
-    existingSummary = ""
-  ) => {
-    try {
-      const messagesToSummarize = messages.slice(0, -4); // All but last 4 messages
-      const conversationText = messagesToSummarize
-        .map(
-          (msg) =>
-            `${msg.type === "user" ? "User" : "Assistant"}: ${msg.content}`
-        )
-        .join("\n");
-
-      const summaryPrompt = `
-        ${existingSummary ? `Previous summary: ${existingSummary}\n\n` : ""}
-        Please create a concise summary of this travel conversation, focusing on:
-        - Key decisions made (restaurants chosen, activities planned, etc.)
-        - Important preferences mentioned
-        - Specific recommendations given and accepted
-        - Any bookings or reservations discussed
-        
-        Conversation to summarize:
-        ${conversationText}
-        
-        Provide a brief, factual summary that preserves important context for future conversations:
-      `;
-
-      // You'll need to implement this API call to your AI service
-      const response = await sendChatMessage(
-        summaryPrompt,
-        trip.id || trip.firestoreId,
-        user.uid,
-        { destination: trip.destination },
-        [],
-        "summary"
-      );
-
-      return response.response;
-    } catch (error) {
-      console.error("Error generating summary:", error);
-      return existingSummary;
-    }
-  };
-
-  // Fallback method without orderBy (for when index is not ready)
-  const loadChatHistoryFallback = async () => {
-    try {
-      const chatId = `${user.uid}_${trip.id || trip.firestoreId}`;
-
-      // Load summary first
-      await loadConversationSummary(chatId);
-
-      // Simple query without orderBy
-      const q = query(
-        collection(db, "chatHistory"),
-        where("chatId", "==", chatId),
-        limit(50)
-      );
-
-      const querySnapshot = await getDocs(q);
-      const chatHistory = [];
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        chatHistory.push({
-          id: doc.id,
-          ...data,
-          timestamp:
-            data.createdAt?.toDate() || new Date(data.timestamp) || new Date(),
-        });
-      });
-
-      // Sort manually by timestamp
-      chatHistory.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-      if (chatHistory.length > 0) {
-        setMessages(chatHistory);
-        setMessageCount(chatHistory.length);
-      } else {
-        await initializeWelcomeMessage(chatId);
-      }
-    } catch (error) {
-      console.error("Fallback query also failed:", error);
-      const chatId = `${user.uid}_${trip.id || trip.firestoreId}`;
-      await initializeWelcomeMessage(chatId);
-    }
-  };
-
   const initializeWelcomeMessage = async (chatId) => {
+    const messageId = generateMessageId("welcome");
     const welcomeMessage = {
-      id: `welcome_${Date.now()}`,
+      id: messageId,
       type: "ai",
       content: `Hi! I'm here to help you with your ${trip.destination} trip. Feel free to ask me anything about your itinerary, recommendations, or travel tips!`,
       timestamp: new Date(),
@@ -298,48 +191,41 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
 
   const saveChatMessage = async (message) => {
     try {
+      // Validate message content
+      if (!message.content || message.content.trim() === '') {
+        console.error("Cannot save message with empty content");
+        return;
+      }
+
+      // Create a unique document ID for this message
+      const messageDocId = message.id || generateMessageId(message.type);
+      
       const messageData = {
         type: message.type,
-        content: message.content,
+        content: message.content.trim(), // Ensure content is not empty
         userId: user.uid,
         tripId: trip.id || trip.firestoreId,
-        chatId: `${user.uid}_${trip.id || trip.firestoreId}`,
-        createdAt: serverTimestamp(), // Use server timestamp for consistency
-        timestamp: new Date().toISOString(), // Keep as backup
+        chatId: getChatId(),
+        createdAt: serverTimestamp(),
+        timestamp: new Date().toISOString(),
+        messageId: messageDocId, // Store the message ID for reference
       };
 
-      await addDoc(collection(db, "chatHistory"), messageData);
+      // Use setDoc with a specific document ID instead of addDoc
+      const messageRef = doc(db, "chatHistory", messageDocId);
+      await setDoc(messageRef, messageData);
+      
+      console.log("Message saved successfully:", messageDocId);
     } catch (error) {
       console.error("Error saving chat message:", error);
+      throw error; // Re-throw to handle in calling function
     }
   };
 
-  const generateAIResponse = async (
-    userMessage,
-    tripContext,
-    hybridContext
-  ) => {
-    try {
-      const response = await sendChatMessage(
-        userMessage,
-        trip.id || trip.firestoreId,
-        user.uid,
-        tripContext,
-        hybridContext
-      );
-      return response.response;
-    } catch (error) {
-      console.error("Error generating AI response:", error);
-      throw error;
-    }
-  };
-
-  // Prepare hybrid context (summary + recent messages)
-  const prepareHybridContext = (messages, summary) => {
-    // Ensure messages is always an array
-    const safeMessages = Array.isArray(messages) ? messages : [];
-
-    const recentMessages = safeMessages.slice(-5).map((msg) => ({
+  // Prepare context for AI (summary + last 4 messages)
+  const prepareContextForAI = (allMessages, summary) => {
+    const safeMessages = Array.isArray(allMessages) ? allMessages : [];
+    const recentMessages = safeMessages.slice(-4).map((msg) => ({
       type: msg.type,
       content: msg.content,
       timestamp: msg.timestamp,
@@ -352,13 +238,69 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
     };
   };
 
+  // Generate summary of messages (all except last 4)
+  const generateConversationSummary = async (allMessages, existingSummary = "") => {
+    try {
+      if (allMessages.length <= 4) {
+        return existingSummary;
+      }
+
+      // Messages to summarize (all except last 4)
+      const messagesToSummarize = allMessages.slice(0, -4);
+      
+      if (messagesToSummarize.length === 0) {
+        return existingSummary;
+      }
+
+      const conversationText = messagesToSummarize
+        .map((msg) => `${msg.type === "user" ? "User" : "Assistant"}: ${msg.content}`)
+        .join("\n");
+
+      const summaryPrompt = `${existingSummary ? `Previous summary: ${existingSummary}\n\n` : ""}Please create a concise summary of this travel conversation, focusing on:
+- Key decisions made (restaurants chosen, activities planned, etc.)
+- Important preferences mentioned
+- Specific recommendations given and accepted
+- Any bookings or reservations discussed
+
+Conversation to summarize:
+${conversationText}
+
+Provide a brief, factual summary that preserves important context for future conversations:`;
+
+      const response = await sendChatMessage(
+        summaryPrompt,
+        trip.id || trip.firestoreId,
+        user.uid,
+        {
+          destination: trip.destination,
+          duration: trip.duration,
+          startDate: trip.startDate,
+          preferences: trip.preferences,
+          budget: trip.budget,
+          groupType: trip.groupType,
+        },
+        {
+          conversationSummary: "",
+          recentMessages: [],
+          totalMessages: 0,
+        },
+        "summary"
+      );
+
+      return response.message;
+    } catch (error) {
+      console.error("Error generating summary:", error);
+      return existingSummary;
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !user) return;
 
-    const chatId = `${user.uid}_${trip.id || trip.firestoreId}`;
-
+    const chatId = getChatId();
+    const messageId = generateMessageId("user");
     const userMessage = {
-      id: `user_${Date.now()}`,
+      id: messageId,
       type: "user",
       content: inputMessage.trim(),
       timestamp: new Date(),
@@ -370,49 +312,41 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
     setInputMessage("");
     setIsLoading(true);
 
-    // Save user message to Firebase
-    await saveChatMessage(userMessage);
-
     try {
+      // Save user message to Firebase
+      await saveChatMessage(userMessage);
+
       // Update message count
       const newMessageCount = messageCount + 1;
       setMessageCount(newMessageCount);
 
-
-
-
-      console.log('Debug values:', {
-        newMessageCount,
-        modulo: newMessageCount % 10,
-        messagesLength: messages.length,
-        allConditions: newMessageCount > 0 && newMessageCount % 10 === 0 && messages.length > 8
-      });
-
-
-
-
       // Check if we need to update the summary (every 10 messages)
       let currentSummary = conversationSummary;
+      const allMessagesIncludingNew = [...messages, userMessage];
+
+      console.log("Debug summary check:", {
+        newMessageCount,
+        modulo: newMessageCount % 10,
+        messagesLength: allMessagesIncludingNew.length,
+        shouldSummarize: newMessageCount > 0 && newMessageCount % 10 === 0 && allMessagesIncludingNew.length > 8
+      });
+
       if (
         newMessageCount > 0 &&
         newMessageCount % 10 === 0 &&
-        messages.length > 8
+        allMessagesIncludingNew.length > 8
       ) {
         console.log("Updating conversation summary...");
         currentSummary = await generateConversationSummary(
-          messages,
+          allMessagesIncludingNew,
           conversationSummary
         );
         setConversationSummary(currentSummary);
         await saveConversationSummary(chatId, currentSummary);
       }
 
-      // Prepare hybrid context with safety checks
-      const safeMessages = Array.isArray(messages) ? messages : [];
-      const hybridContext = prepareHybridContext(
-        [...safeMessages, userMessage],
-        currentSummary
-      );
+      // Prepare context for AI
+      const contextForAI = prepareContextForAI(allMessagesIncludingNew, currentSummary);
 
       // Prepare trip context
       const tripContext = {
@@ -426,16 +360,25 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
         weather: trip.weather,
       };
 
-      const aiResponse = await generateAIResponse(
+      // Send message to AI
+      const aiResponse = await sendChatMessage(
         currentInput,
+        trip.id || trip.firestoreId,
+        user.uid,
         tripContext,
-        hybridContext
+        contextForAI
       );
 
+      // Validate AI response
+      if (!aiResponse || !aiResponse.message || aiResponse.message.trim() === '') {
+        throw new Error("Invalid AI response received");
+      }
+
+      const aiMessageId = generateMessageId("ai");
       const aiMessage = {
-        id: `ai_${Date.now()}`,
+        id: aiMessageId,
         type: "ai",
-        content: aiResponse,
+        content: aiResponse.message.trim(),
         timestamp: new Date(),
         chatId: chatId,
       };
@@ -447,16 +390,22 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
       await saveChatMessage(aiMessage);
     } catch (error) {
       console.error("Error in chat:", error);
+      const errorMessageId = generateMessageId("error");
       const errorMessage = {
-        id: `error_${Date.now()}`,
+        id: errorMessageId,
         type: "ai",
-        content:
-          "I'm sorry, I'm having trouble responding right now. Please try again in a moment.",
+        content: "I'm sorry, I'm having trouble responding right now. Please try again in a moment.",
         timestamp: new Date(),
         chatId: chatId,
       };
       setMessages((prev) => [...prev, errorMessage]);
-      await saveChatMessage(errorMessage);
+      
+      // Try to save error message, but don't throw if it fails
+      try {
+        await saveChatMessage(errorMessage);
+      } catch (saveError) {
+        console.error("Could not save error message:", saveError);
+      }
     } finally {
       setIsLoading(false);
     }
