@@ -316,9 +316,112 @@ app.post('/api/complete-itinerary', async (req, res) => {
 
 
 
+// app.post('/api/chat', async (req, res) => {
+//   try {
+//     const { message, tripId, userId, chatHistory = [] } = req.body;
+    
+//     // Validate input
+//     if (!message || !tripId || !userId) {
+//       return res.status(400).json({
+//         error: 'Missing required fields: message, tripId, and userId are required'
+//       });
+//     }
+
+//     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+//     if (!GEMINI_API_KEY) {
+//       return res.status(500).json({
+//         error: 'Gemini API key not configured on server'
+//       });
+//     }
+
+//     console.log('💬 Processing chat message for trip:', tripId);
+    
+//     // Get trip context
+//     const tripContext = req.body.tripContext || {};
+    
+//     // Limit chat history to last 8 messages for context
+//     const recentHistory = chatHistory.slice(-8);
+    
+//     const prompt = `You are a helpful travel assistant. You have access to the user's trip details and previous conversation history.
+
+// Trip Context: ${JSON.stringify(tripContext, null, 2)}
+
+// Previous Conversation: ${JSON.stringify(recentHistory, null, 2)}
+
+// User's New Message: "${message}"
+
+// Please respond as a knowledgeable travel assistant who:
+// 1. Remembers our previous conversation
+// 2. Provides specific, helpful advice about their trip
+// 3. References their itinerary, preferences, and trip details when relevant
+// 4. Offers practical suggestions and tips
+
+// Respond in a natural, conversational tone. Keep your response concise and specific to the question asked but helpful (preferably 5-lines) .`;
+
+//     const response = await fetch(
+//       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${GEMINI_API_KEY}`,
+//       {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//         },
+//         body: JSON.stringify({
+//           contents: [{
+//             parts: [{ text: prompt }]
+//           }],
+//           generationConfig: {
+//             temperature: 0.7,
+//             topK: 40,
+//             topP: 0.9,
+//             maxOutputTokens: 4000,
+//           }
+//         })
+//       }
+//     );
+
+//     if (!response.ok) {
+//       const errorText = await response.text();
+//       console.error('Gemini API error:', errorText);
+//       throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+//     }
+
+//     const data = await response.json();
+//     console.log('🤖 Gemini response structure:', JSON.stringify(data, null, 2));
+
+//     // Better validation of response structure
+//     if (!data.candidates || 
+//         data.candidates.length === 0 || 
+//         !data.candidates[0].content || 
+//         !data.candidates[0].content.parts || 
+//         data.candidates[0].content.parts.length === 0 ||
+//         !data.candidates[0].content.parts[0].text) {
+      
+//       console.error('Invalid Gemini response structure:', data);
+//       throw new Error('Invalid response structure from Gemini API');
+//     }
+
+//     const aiResponse = data.candidates[0].content.parts[0].text;
+
+//     // Return the AI response
+//     res.json({
+//       response: aiResponse,
+//       timestamp: new Date().toISOString()
+//     });
+
+//   } catch (error) {
+//     console.error('❌ Chat API error:', error.message);
+    
+//     // Make sure we always return valid JSON
+//     res.status(500).json({
+//       error: 'Failed to process chat message',
+//       details: error.message
+//     });
+//   }
+// });
+
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, tripId, userId, chatHistory = [] } = req.body;
+    const { message, tripId, userId, hybridContext = {} } = req.body;
     
     // Validate input
     if (!message || !tripId || !userId) {
@@ -339,24 +442,36 @@ app.post('/api/chat', async (req, res) => {
     // Get trip context
     const tripContext = req.body.tripContext || {};
     
-    // Limit chat history to last 8 messages for context
-    const recentHistory = chatHistory.slice(-8);
+    // Extract conversation data from hybridContext
+    const conversationSummary = hybridContext.conversationSummary || '';
+    const recentMessages = Array.isArray(hybridContext.recentMessages) ? hybridContext.recentMessages : [];
+    const totalMessages = hybridContext.totalMessages || 0;
+    
+    // Build the prompt with conversation context
+    let conversationContext = '';
+    if (conversationSummary && conversationSummary.trim()) {
+      conversationContext += `\nConversation Summary: ${conversationSummary}\n`;
+    }
+    
+    if (recentMessages.length > 0) {
+      conversationContext += `\nRecent Messages:\n${JSON.stringify(recentMessages, null, 2)}\n`;
+    }
     
     const prompt = `You are a helpful travel assistant. You have access to the user's trip details and previous conversation history.
 
 Trip Context: ${JSON.stringify(tripContext, null, 2)}
-
-Previous Conversation: ${JSON.stringify(recentHistory, null, 2)}
+${conversationContext}
+Total Messages in Conversation: ${totalMessages}
 
 User's New Message: "${message}"
 
 Please respond as a knowledgeable travel assistant who:
-1. Remembers our previous conversation
+1. Remembers our previous conversation (use the summary and recent messages for context)
 2. Provides specific, helpful advice about their trip
 3. References their itinerary, preferences, and trip details when relevant
 4. Offers practical suggestions and tips
 
-Respond in a natural, conversational tone. Keep your response concise and specific to the question asked but helpful (preferably 5-lines) .`;
+Respond in a natural, conversational tone. Keep your response concise and specific to the question asked but helpful (preferably 5-lines).`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${GEMINI_API_KEY}`,
@@ -418,8 +533,6 @@ Respond in a natural, conversational tone. Keep your response concise and specif
     });
   }
 });
-
-
 
 
 
