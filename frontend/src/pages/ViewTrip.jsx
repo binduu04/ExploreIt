@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import React, { useState,useEffect } from 'react'
+import { ArrowLeft,Calendar,CalendarPlus } from 'lucide-react'
 import { useTrip } from '../context/TripContext'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +10,325 @@ const ViewTrip = () => {
   const { user } = useAuth()
   //const [saveLoading, setSaveLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
+
+
+  const [calendarLoading, setCalendarLoading] = useState(false)
+const [hasCalendarPermissions, setHasCalendarPermissions] = useState(false)
+const [calendarStatus, setCalendarStatus] = useState('')
+
+useEffect(() => {
+  checkCalendarPermissions()
+}, [user])
+
+const checkCalendarPermissions = async () => {
+  if (!user) return
+  
+  try {
+    console.log('Checking calendar permissions...')
+    const token = await user.getIdToken()
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/permissions`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+   
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    console.log('Calendar permissions:', data)
+    setHasCalendarPermissions(data.hasPermissions)
+  } catch (error) {
+    console.error('Error checking calendar permissions:', error)
+    setHasCalendarPermissions(false)
+  }
+}
+
+const requestCalendarPermissions = async () => {
+  if (!user) return
+  
+  try {
+    setCalendarLoading(true)
+    setCalendarStatus('Requesting permissions...')
+    
+    console.log('Requesting calendar permissions...')
+    const token = await user.getIdToken()
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/auth-url`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    console.log('Auth URL response:', data)
+    
+    if (data.authUrl) {
+      console.log('Opening OAuth popup...')
+      const authWindow = window.open(
+        data.authUrl, 
+        'google_oauth', 
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      )
+      
+      if (!authWindow) {
+        throw new Error('Popup blocked. Please allow popups for this site.')
+      }
+      
+      const checkMessage = (event) => {
+        console.log('Received message:', event.data, 'from:', event.origin)
+        
+        if (event.origin !== window.location.origin) {
+          console.log('Ignoring message from different origin')
+          return
+        }
+        
+        if (event.data === 'oauth_success') {
+          console.log('OAuth success received')
+          window.removeEventListener('message', checkMessage)
+          setCalendarStatus('✅ Calendar connected successfully!')
+          setTimeout(() => {
+            checkCalendarPermissions()
+            setCalendarStatus('')
+          }, 2000)
+          setCalendarLoading(false)
+        } else if (event.data === 'oauth_error') {
+          console.log('OAuth error received')
+          window.removeEventListener('message', checkMessage)
+          setCalendarStatus('❌ Failed to connect calendar')
+          setTimeout(() => setCalendarStatus(''), 3000)
+          setCalendarLoading(false)
+        }
+      }
+      
+      window.addEventListener('message', checkMessage)
+      
+      // Check if popup was closed manually
+      const checkClosed = setInterval(() => {
+        if (authWindow.closed) {
+          clearInterval(checkClosed)
+          window.removeEventListener('message', checkMessage)
+          if (calendarLoading) {
+            setCalendarStatus('❌ Authorization cancelled')
+            setTimeout(() => setCalendarStatus(''), 3000)
+            setCalendarLoading(false)
+          }
+        }
+      }, 1000)
+      
+    } else {
+      throw new Error('No auth URL received from server')
+    }
+  } catch (error) {
+    console.error('Error requesting calendar permissions:', error)
+    setCalendarStatus(`❌ Error: ${error.message}`)
+    setTimeout(() => setCalendarStatus(''), 5000)
+    setCalendarLoading(false)
+  }
+}
+
+const addToCalendar = async () => {
+  if (!user || !currentTrip) {
+    setCalendarStatus('❌ No trip data available')
+    setTimeout(() => setCalendarStatus(''), 3000)
+    return
+  }
+  
+  if (!hasCalendarPermissions) {
+    setCalendarStatus('❌ Calendar permissions required')
+    setTimeout(() => setCalendarStatus(''), 3000)
+    return
+  }
+  
+  try {
+    setCalendarLoading(true)
+    setCalendarStatus('Adding events to calendar...')
+    
+    console.log('Adding trip to calendar:', currentTrip)
+    const token = await user.getIdToken()
+    
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/add-trip`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ tripData: currentTrip })
+    })
+    
+    console.log('Add to calendar response status:', response.status)
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Server error: ${response.status} - ${errorText}`)
+    }
+    
+    const data = await response.json()
+    console.log('Add to calendar response:', data)
+    
+    if (data.success) {
+      setCalendarStatus(`✅ ${data.message}`)
+      setTimeout(() => setCalendarStatus(''), 5000)
+    } else {
+      setCalendarStatus(`❌ ${data.error || 'Failed to add to calendar'}`)
+      setTimeout(() => setCalendarStatus(''), 5000)
+    }
+  } catch (error) {
+    console.error('Error adding to calendar:', error)
+    setCalendarStatus(`❌ Error: ${error.message}`)
+    setTimeout(() => setCalendarStatus(''), 5000)
+  } finally {
+    setCalendarLoading(false)
+  }
+}
+
+//   const [calendarLoading, setCalendarLoading] = useState(false)
+//   const [hasCalendarPermissions, setHasCalendarPermissions] = useState(false)
+//   const [calendarStatus, setCalendarStatus] = useState('')
+
+
+//    useEffect(() => {
+//     checkCalendarPermissions()
+//   }, [user])
+
+//   const checkCalendarPermissions = async () => {
+//     if (!user) return
+
+//     try {
+//       const token = await user.getIdToken()
+//       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/permissions`, {
+//         headers: {
+//           'Authorization': `Bearer ${token}`
+//         }
+//       })
+      
+//       const data = await response.json()
+//       setHasCalendarPermissions(data.hasPermissions)
+//     } catch (error) {
+//       console.error('Error checking calendar permissions:', error)
+//     }
+//   }
+
+//   // const requestCalendarPermissions = async () => {
+//   //   if (!user) return
+
+//   //   try {
+//   //     setCalendarLoading(true)
+//   //     const token = await user.getIdToken()
+      
+//   //     const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/auth-url`, {
+//   //       method: 'POST',
+//   //       headers: {
+//   //         'Authorization': `Bearer ${token}`,
+//   //         'Content-Type': 'application/json'
+//   //       }
+//   //     })
+
+//   //     const data = await response.json()
+      
+//   //     if (data.authUrl) {
+//   //       // Open Google OAuth in a new window
+//   //       const authWindow = window.open(data.authUrl, 'GoogleAuth', 'width=500,height=600')
+        
+//   //       // Listen for the OAuth completion
+//   //       const checkClosed = setInterval(() => {
+//   //         if (authWindow.closed) {
+//   //           clearInterval(checkClosed)
+//   //           // Check permissions again after OAuth
+//   //           setTimeout(checkCalendarPermissions, 1000)
+//   //           setCalendarLoading(false)
+//   //         }
+//   //       }, 1000)
+//   //     }
+//   //   } catch (error) {
+//   //     console.error('Error requesting calendar permissions:', error)
+//   //     setCalendarLoading(false)
+//   //   }
+//   // }
+
+
+//   const requestCalendarPermissions = async () => {
+//   if (!user) return
+
+//   try {
+//     setCalendarLoading(true)
+//     const token = await user.getIdToken()
+
+//     const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/auth-url`, {
+//       method: 'POST',
+//       headers: {
+//         'Authorization': `Bearer ${token}`,
+//         'Content-Type': 'application/json'
+//       }
+//     })
+
+//     const data = await response.json()
+
+//     if (data.authUrl) {
+//       const authWindow = window.open(data.authUrl, '_blank', 'width=500,height=600')
+
+//       const checkMessage = (event) => {
+//         if (event.origin !== window.location.origin) return
+//         if (event.data === 'oauth_success') {
+//           window.removeEventListener('message', checkMessage)
+//           setTimeout(checkCalendarPermissions, 500)
+//           setCalendarLoading(false)
+//         }
+//       }
+
+//       window.addEventListener('message', checkMessage)
+//     }
+//   } catch (error) {
+//     console.error('Error requesting calendar permissions:', error)
+//     setCalendarLoading(false)
+//   }
+// }
+
+
+//   const addToCalendar = async () => {
+//     if (!user || !currentTrip) return
+
+//     try {
+//       setCalendarLoading(true)
+//       setCalendarStatus('Adding to calendar...')
+      
+//       const token = await user.getIdToken()
+      
+//       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/add-trip`, {
+//         method: 'POST',
+//         headers: {
+//           'Authorization': `Bearer ${token}`,
+//           'Content-Type': 'application/json'
+//         },
+//         body: JSON.stringify({ tripData: currentTrip })
+//       })
+
+//       const data = await response.json()
+      
+//       if (data.success) {
+//         setCalendarStatus(`✅ ${data.message}`)
+//         setTimeout(() => setCalendarStatus(''), 3000)
+//       } else {
+//         setCalendarStatus('❌ Failed to add to calendar')
+//         setTimeout(() => setCalendarStatus(''), 3000)
+//       }
+//     } catch (error) {
+//       console.error('Error adding to calendar:', error)
+//       setCalendarStatus('❌ Error adding to calendar')
+//       setTimeout(() => setCalendarStatus(''), 3000)
+//     } finally {
+//       setCalendarLoading(false)
+//     }
+//   }
+
+
+
 
   // Export to PDF function using browser's print functionality with better formatting
   const exportToPDF = async () => {
@@ -669,6 +988,38 @@ const ViewTrip = () => {
    <ArrowLeft className="w-5 h-5 mr-2" />
     Back to Home
   </button> 
+
+  {/* Calendar Integration */}
+                {user && (
+                  <div className="space-y-2">
+                    {!hasCalendarPermissions ? (
+                      <button
+                        onClick={requestCalendarPermissions}
+                        disabled={calendarLoading}
+                        className="flex justify-center bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+                      >
+                        <Calendar className="w-5 h-5 mr-2" />
+                        {calendarLoading ? 'Connecting...' : 'Connect Calendar'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={addToCalendar}
+                        disabled={calendarLoading}
+                        className="flex justify-center bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+                      >
+                        <CalendarPlus className="w-5 h-5 mr-2" />
+                        {calendarLoading ? 'Adding...' : 'Add to Calendar'}
+                      </button>
+                    )}
+                    
+                    {/* Calendar Status */}
+                    {calendarStatus && (
+                      <div className="text-center text-sm bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                        {calendarStatus}
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 {/* Export Options */}
                 <div className="flex gap-2 flex-wrap">

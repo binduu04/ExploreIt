@@ -8,6 +8,7 @@ import TripPlanner from './pages/TripPlanner'
 import Itinerary from './pages/Itinerary'
 import SavedTrips from './pages/SavedTrips'
 import ViewTrip from './pages/ViewTrip'
+import AuthCallback from './pages/AuthCallBack'
 import './App.css'
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
               <Route path="/itinerary" element={<Itinerary />} />
               <Route path="/my-trips" element={<SavedTrips />} />
               <Route path="/viewtrip" element={<ViewTrip />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
             </Routes>
           </div>
         </Router>
