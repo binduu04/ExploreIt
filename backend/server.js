@@ -629,122 +629,11 @@ app.post('/api/complete-itinerary', async (req, res) => {
 
 
 
-// app.post('/api/chat', async (req, res) => {
-//   try {
-//     const { message, tripId, userId, chatHistory = [] } = req.body;
-    
-//     // Validate input
-//     if (!message || !tripId || !userId) {
-//       return res.status(400).json({
-//         error: 'Missing required fields: message, tripId, and userId are required'
-//       });
-//     }
-
-//     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-//     if (!GEMINI_API_KEY) {
-//       return res.status(500).json({
-//         error: 'Gemini API key not configured on server'
-//       });
-//     }
-
-//     console.log('💬 Processing chat message for trip:', tripId);
-    
-//     // Get trip context
-//     const tripContext = req.body.tripContext || {};
-    
-//     // Limit chat history to last 8 messages for context
-//     const recentHistory = chatHistory.slice(-8);
-    
-//     const prompt = `You are a helpful travel assistant. You have access to the user's trip details and previous conversation history.
-
-// Trip Context: ${JSON.stringify(tripContext, null, 2)}
-
-// Previous Conversation: ${JSON.stringify(recentHistory, null, 2)}
-
-// User's New Message: "${message}"
-
-// Please respond as a knowledgeable travel assistant who:
-// 1. Remembers our previous conversation
-// 2. Provides specific, helpful advice about their trip
-// 3. References their itinerary, preferences, and trip details when relevant
-// 4. Offers practical suggestions and tips
-
-// Respond in a natural, conversational tone. Keep your response concise and specific to the question asked but helpful (preferably 5-lines) .`;
-
-//     const response = await fetch(
-//       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${GEMINI_API_KEY}`,
-//       {
-//         method: 'POST',
-//         headers: {
-//           'Content-Type': 'application/json',
-//         },
-//         body: JSON.stringify({
-//           contents: [{
-//             parts: [{ text: prompt }]
-//           }],
-//           generationConfig: {
-//             temperature: 0.7,
-//             topK: 40,
-//             topP: 0.9,
-//             maxOutputTokens: 4000,
-//           }
-//         })
-//       }
-//     );
-
-//     if (!response.ok) {
-//       const errorText = await response.text();
-//       console.error('Gemini API error:', errorText);
-//       throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-//     }
-
-//     const data = await response.json();
-//     console.log('🤖 Gemini response structure:', JSON.stringify(data, null, 2));
-
-//     // Better validation of response structure
-//     if (!data.candidates || 
-//         data.candidates.length === 0 || 
-//         !data.candidates[0].content || 
-//         !data.candidates[0].content.parts || 
-//         data.candidates[0].content.parts.length === 0 ||
-//         !data.candidates[0].content.parts[0].text) {
-      
-//       console.error('Invalid Gemini response structure:', data);
-//       throw new Error('Invalid response structure from Gemini API');
-//     }
-
-//     const aiResponse = data.candidates[0].content.parts[0].text;
-
-//     // Return the AI response
-//     res.json({
-//       response: aiResponse,
-//       timestamp: new Date().toISOString()
-//     });
-
-//   } catch (error) {
-//     console.error('❌ Chat API error:', error.message);
-    
-//     // Make sure we always return valid JSON
-//     res.status(500).json({
-//       error: 'Failed to process chat message',
-//       details: error.message
-//     });
-//   }
-// });
-
-
 app.post('/api/chat', async (req, res) => {
   try {
-    const { 
-      message, 
-      tripId, 
-      userId, 
-      tripContext = {}, 
-      hybridContext = {}, 
-      messageType = "chat" 
-    } = req.body;
+    const { message, tripId, userId, chatHistory = [] } = req.body;
     
-    // Validate required input
+    // Validate input
     if (!message || !tripId || !userId) {
       return res.status(400).json({
         error: 'Missing required fields: message, tripId, and userId are required'
@@ -758,187 +647,301 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
-    console.log('💬 Processing chat message:', {
-      messageType,
-      tripId,
-      userId,
-      messageLength: message.length,
-      hasContext: !!tripContext,
-      hasSummary: !!(hybridContext.conversationSummary),
-      recentMessagesCount: hybridContext.recentMessages?.length || 0,
-      totalMessages: hybridContext.totalMessages || 0
-    });
+    console.log('💬 Processing chat message for trip:', tripId);
     
-    // Extract conversation data from hybridContext
-    const conversationSummary = hybridContext.conversationSummary || '';
-    const recentMessages = Array.isArray(hybridContext.recentMessages) ? hybridContext.recentMessages : [];
-    const totalMessages = hybridContext.totalMessages || 0;
+    // Get trip context
+    const tripContext = req.body.tripContext || {};
     
-    // Build conversation context string
-    let conversationContext = '';
+    // Limit chat history to last 8 messages for context
+    const recentHistory = chatHistory.slice(-8);
     
-    // Add summary if it exists
-    if (conversationSummary && conversationSummary.trim()) {
-      conversationContext += `\nPrevious Conversation Summary:\n${conversationSummary}\n`;
-    }
-    
-    // Add recent messages if they exist
-    if (recentMessages.length > 0) {
-      conversationContext += `\nRecent Messages:\n`;
-      recentMessages.forEach((msg, index) => {
-        const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
-        conversationContext += `${msg.type === "user" ? "User" : "Assistant"} ${timestamp}: ${msg.content}\n`;
-      });
-    }
-    
-    // Build the appropriate prompt based on message type
-    let prompt;
-    
-    if (messageType === "summary") {
-      // Special prompt for generating summaries
-      prompt = `You are tasked with creating a concise conversation summary for a travel chat.
+    const prompt = `You are a helpful travel assistant. You have access to the user's trip details and previous conversation history.
 
-${message}
+Trip Context: ${JSON.stringify(tripContext, null, 2)}
 
-Please provide a clear, factual summary that captures the key points of the conversation. Focus on:
-- Main travel questions asked
-- Destinations or locations discussed
-- Key recommendations provided
-- Important trip details mentioned
-- Any decisions made or preferences expressed
+Previous Conversation: ${JSON.stringify(recentHistory, null, 2)}
 
-Keep the summary under 200 words and make it useful for future conversation context.`;
-    } else {
-      // Regular chat prompt
-      prompt = `You are a helpful travel assistant. You have access to the user's trip details and previous conversation history.
+User's New Message: "${message}"
 
-Trip Details:
-${JSON.stringify(tripContext, null, 2)}
+Please respond as a knowledgeable travel assistant who:
+1. Remembers our previous conversation
+2. Provides specific, helpful advice about their trip
+3. References their itinerary, preferences, and trip details when relevant
+4. Offers practical suggestions and tips
 
-${conversationContext}
+Respond in a natural, conversational tone. Keep your response concise and specific to the question asked but helpful (preferably 5-lines) .`;
 
-Total Messages in Conversation: ${totalMessages}
-
-User's Current Message: "${message}"
-
-Instructions for your response:
-1. Use the conversation summary and recent messages to maintain context
-2. Provide specific, helpful advice about their trip
-3. Reference their itinerary, preferences, and trip details when relevant
-4. Offer practical suggestions and actionable tips
-5. Keep responses conversational and concise (preferably 3-5 sentences unless more detail is specifically requested)
-6. If the user asks about something not covered in their trip details, provide general helpful travel advice
-7. Be friendly, knowledgeable, and supportive
-
-Please provide a helpful response to the user's message.`;
-    }
-
-    // Make request to Gemini API
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
-            }
-          ],
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
           generationConfig: {
             temperature: 0.7,
             topK: 40,
-            topP: 0.95,
-            maxOutputTokens: messageType === "summary" ? 300 : 500,
-          },
-          safetySettings: [
-            {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            }
-          ]
+            topP: 0.9,
+            maxOutputTokens: 4000,
+          }
         })
       }
     );
 
-    if (!geminiResponse.ok) {
-      const errorData = await geminiResponse.json().catch(() => ({}));
-      console.error('Gemini API error:', errorData);
-      throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorData.error?.message || 'Unknown error'}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error:', errorText);
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
     }
 
-    const geminiData = await geminiResponse.json();
-    
-    // Extract the generated text
-    let generatedText = '';
-    if (geminiData.candidates && geminiData.candidates.length > 0) {
-      const candidate = geminiData.candidates[0];
-      if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-        generatedText = candidate.content.parts[0].text;
-      }
+    const data = await response.json();
+    console.log('🤖 Gemini response structure:', JSON.stringify(data, null, 2));
+
+    // Better validation of response structure
+    if (!data.candidates || 
+        data.candidates.length === 0 || 
+        !data.candidates[0].content || 
+        !data.candidates[0].content.parts || 
+        data.candidates[0].content.parts.length === 0 ||
+        !data.candidates[0].content.parts[0].text) {
+      
+      console.error('Invalid Gemini response structure:', data);
+      throw new Error('Invalid response structure from Gemini API');
     }
 
-    if (!generatedText) {
-      throw new Error('No response generated from Gemini API');
-    }
+    const aiResponse = data.candidates[0].content.parts[0].text;
 
-    // Clean up the response
-    generatedText = generatedText.trim();
-
-    console.log('✅ Generated response:', {
-      messageType,
-      responseLength: generatedText.length,
-      tripId,
-      userId
-    });
-
-    // Return the response
+    // Return the AI response
     res.json({
-      message: generatedText,
-      timestamp: new Date().toISOString(),
-      messageType,
-      metadata: {
-        totalMessages,
-        hasConversationSummary: !!conversationSummary,
-        recentMessagesCount: recentMessages.length
-      }
+      response: aiResponse,
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('Chat endpoint error:', error);
+    console.error('❌ Chat API error:', error.message);
     
-    // Return appropriate error response
-    if (error.message.includes('Gemini API')) {
-      res.status(502).json({
-        error: 'AI service temporarily unavailable. Please try again.',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    } else {
-      res.status(500).json({
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
+    // Make sure we always return valid JSON
+    res.status(500).json({
+      error: 'Failed to process chat message',
+      details: error.message
+    });
   }
 });
+
+
+
+
+
+// app.post('/api/chat', async (req, res) => {
+//   try {
+//     const { 
+//       message, 
+//       tripId, 
+//       userId, 
+//       tripContext = {}, 
+//       hybridContext = {}, 
+//       messageType = "chat" 
+//     } = req.body;
+    
+//     // Validate required input
+//     if (!message || !tripId || !userId) {
+//       return res.status(400).json({
+//         error: 'Missing required fields: message, tripId, and userId are required'
+//       });
+//     }
+
+//     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+//     if (!GEMINI_API_KEY) {
+//       return res.status(500).json({
+//         error: 'Gemini API key not configured on server'
+//       });
+//     }
+
+//     console.log('💬 Processing chat message:', {
+//       messageType,
+//       tripId,
+//       userId,
+//       messageLength: message.length,
+//       hasContext: !!tripContext,
+//       hasSummary: !!(hybridContext.conversationSummary),
+//       recentMessagesCount: hybridContext.recentMessages?.length || 0,
+//       totalMessages: hybridContext.totalMessages || 0
+//     });
+    
+//     // Extract conversation data from hybridContext
+//     const conversationSummary = hybridContext.conversationSummary || '';
+//     const recentMessages = Array.isArray(hybridContext.recentMessages) ? hybridContext.recentMessages : [];
+//     const totalMessages = hybridContext.totalMessages || 0;
+    
+//     // Build conversation context string
+//     let conversationContext = '';
+    
+//     // Add summary if it exists
+//     if (conversationSummary && conversationSummary.trim()) {
+//       conversationContext += `\nPrevious Conversation Summary:\n${conversationSummary}\n`;
+//     }
+    
+//     // Add recent messages if they exist
+//     if (recentMessages.length > 0) {
+//       conversationContext += `\nRecent Messages:\n`;
+//       recentMessages.forEach((msg, index) => {
+//         const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+//         conversationContext += `${msg.type === "user" ? "User" : "Assistant"} ${timestamp}: ${msg.content}\n`;
+//       });
+//     }
+    
+//     // Build the appropriate prompt based on message type
+//     let prompt;
+    
+//     if (messageType === "summary") {
+//       // Special prompt for generating summaries
+//       prompt = `You are tasked with creating a concise conversation summary for a travel chat.
+
+// ${message}
+
+// Please provide a clear, factual summary that captures the key points of the conversation. Focus on:
+// - Main travel questions asked
+// - Destinations or locations discussed
+// - Key recommendations provided
+// - Important trip details mentioned
+// - Any decisions made or preferences expressed
+
+// Keep the summary under 200 words and make it useful for future conversation context.`;
+//     } else {
+//       // Regular chat prompt
+//       prompt = `You are a helpful travel assistant. You have access to the user's trip details and previous conversation history.
+
+// Trip Details:
+// ${JSON.stringify(tripContext, null, 2)}
+
+// ${conversationContext}
+
+// Total Messages in Conversation: ${totalMessages}
+
+// User's Current Message: "${message}"
+
+// Instructions for your response:
+// 1. Use the conversation summary and recent messages to maintain context
+// 2. Provide specific, helpful advice about their trip
+// 3. Reference their itinerary, preferences, and trip details when relevant
+// 4. Offer practical suggestions and actionable tips
+// 5. Keep responses conversational and concise (preferably 3-5 sentences unless more detail is specifically requested)
+// 6. If the user asks about something not covered in their trip details, provide general helpful travel advice
+// 7. Be friendly, knowledgeable, and supportive
+
+// Please provide a helpful response to the user's message.`;
+//     }
+
+//     // Make request to Gemini API
+//     const geminiResponse = await fetch(
+//       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+//       {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//         },
+//         body: JSON.stringify({
+//           contents: [
+//             {
+//               parts: [
+//                 {
+//                   text: prompt
+//                 }
+//               ]
+//             }
+//           ],
+//           generationConfig: {
+//             temperature: 0.7,
+//             topK: 40,
+//             topP: 0.95,
+//             maxOutputTokens: messageType === "summary" ? 300 : 500,
+//           },
+//           safetySettings: [
+//             {
+//               category: "HARM_CATEGORY_HARASSMENT",
+//               threshold: "BLOCK_MEDIUM_AND_ABOVE"
+//             },
+//             {
+//               category: "HARM_CATEGORY_HATE_SPEECH",
+//               threshold: "BLOCK_MEDIUM_AND_ABOVE"
+//             },
+//             {
+//               category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+//               threshold: "BLOCK_MEDIUM_AND_ABOVE"
+//             },
+//             {
+//               category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+//               threshold: "BLOCK_MEDIUM_AND_ABOVE"
+//             }
+//           ]
+//         })
+//       }
+//     );
+
+//     if (!geminiResponse.ok) {
+//       const errorData = await geminiResponse.json().catch(() => ({}));
+//       console.error('Gemini API error:', errorData);
+//       throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorData.error?.message || 'Unknown error'}`);
+//     }
+
+//     const geminiData = await geminiResponse.json();
+    
+//     // Extract the generated text
+//     let generatedText = '';
+//     if (geminiData.candidates && geminiData.candidates.length > 0) {
+//       const candidate = geminiData.candidates[0];
+//       if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+//         generatedText = candidate.content.parts[0].text;
+//       }
+//     }
+
+//     if (!generatedText) {
+//       throw new Error('No response generated from Gemini API');
+//     }
+
+//     // Clean up the response
+//     generatedText = generatedText.trim();
+
+//     console.log('✅ Generated response:', {
+//       messageType,
+//       responseLength: generatedText.length,
+//       tripId,
+//       userId
+//     });
+
+//     // Return the response
+//     res.json({
+//       message: generatedText,
+//       timestamp: new Date().toISOString(),
+//       messageType,
+//       metadata: {
+//         totalMessages,
+//         hasConversationSummary: !!conversationSummary,
+//         recentMessagesCount: recentMessages.length
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error('Chat endpoint error:', error);
+    
+//     // Return appropriate error response
+//     if (error.message.includes('Gemini API')) {
+//       res.status(502).json({
+//         error: 'AI service temporarily unavailable. Please try again.',
+//         details: process.env.NODE_ENV === 'development' ? error.message : undefined
+//       });
+//     } else {
+//       res.status(500).json({
+//         error: 'Internal server error',
+//         details: process.env.NODE_ENV === 'development' ? error.message : undefined
+//       });
+//     }
+//   }
+// });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
