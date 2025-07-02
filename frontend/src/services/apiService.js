@@ -91,110 +91,20 @@ const generateCompleteItinerary = async (formData) => {
   }
 };
 
-
-// Chat API service
-// const sendChatMessage = async (message, tripId, userId, tripContext, chatHistory) => {
-//   try {
-//     const response = await fetch('/api/chat', {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//       },
-//       body: JSON.stringify({
-//         message,
-//         tripId,
-//         userId,
-//         tripContext,
-//         chatHistory
-//       })
-//     });
-
-//     if (!response.ok) {
-//       const errorData = await response.json();
-//       throw new Error(errorData.error || 'Failed to send message');
-//     }
-
-//     return await response.json();
-//   } catch (error) {
-//     console.error('Chat API error:', error);
-//     throw error;
-//   }
-// };
-
-// const sendChatMessage = async (user_message, tripId, userId, tripContext, hybrid_context) => {
-//   try {
-//     const response = await fetch(`${API_BASE_URL}/api/chat`, {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json',
-//       },
-//       body: JSON.stringify({
-//         user_message,
-//         tripId,
-//         userId,
-//         tripContext,
-//         hybrid_context
-//       })
-//     });
-
-//     // Check if response is ok first
-//     if (!response.ok) {
-//       let errorData;
-//       try {
-//         errorData = await response.json();
-//       } catch (jsonError) {
-//         // If we can't parse JSON, use status text
-//         throw new Error(`Server error: ${response.status} ${response.statusText}`);
-//       }
-//       throw new Error(errorData.error || `Server error: ${response.status}`);
-//     }
-
-//     // Try to parse JSON response
-//     let data;
-//     try {
-//       data = await response.json();
-//     } catch (jsonError) {
-//       console.error('Failed to parse JSON response:', jsonError);
-//       throw new Error('Invalid response format from server');
-//     }
-
-//     return data;
-    
-//   } catch (error) {
-//     console.error('Chat API error:', error);
-//     throw error;
-//   }
-// };
-
-const sendChatMessage = async (
-  message, 
-  tripId, 
-  userId, 
-  tripContext, 
-  hybridContext, 
-  messageType = "chat"
-) => {
+//chat API Service
+const sendChatMessage = async (message, tripId, userId, tripContext, chatHistory) => {
   try {
-    console.log('📤 Sending chat message:', {
-      messageType,
-      tripId,
-      userId,
-      hasContext: !!tripContext,
-      hasHybridContext: !!hybridContext
-    });
-
     const response = await fetch(`${API_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message,           // The user's message
-        tripId,           // Trip identifier
-        userId,           // User identifier
-        tripContext,      // Trip details (destination, duration, etc.)
-        hybridContext,    // Conversation context (summary + recent messages)
-        messageType       // Type of message ("chat" or "summary")
+        message,
+        tripId,
+        userId,
+        tripContext,
+        chatHistory
       })
     });
 
@@ -219,19 +129,13 @@ const sendChatMessage = async (
       throw new Error('Invalid response format from server');
     }
 
-    console.log('📥 Received chat response:', {
-      hasResponse: !!data.response,
-      timestamp: data.timestamp
-    });
-
     return data;
     
   } catch (error) {
-    console.error('❌ Chat API error:', error);
+    console.error('Chat API error:', error);
     throw error;
   }
 };
-
 
 // Health check function to verify backend connectivity
 const checkBackendHealth = async () => {
