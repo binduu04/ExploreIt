@@ -22,6 +22,7 @@ export const googleProvider = new GoogleAuthProvider()
 export const db = getFirestore(app)
 // Auth Functions
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider)
+
 export const signInAnonymous = () => signInAnonymously(auth)
 export const logOut = () => signOut(auth)
 

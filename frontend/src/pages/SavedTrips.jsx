@@ -471,8 +471,8 @@ const SavedTrips = () => {
                             <div className="flex items-start text-gray-600">
                               <Heart className="w-5 h-5 mr-3 text-pink-500 mt-0.5 flex-shrink-0" />
                               <span className="text-sm leading-relaxed">
-                                {trip.preferences.length > 60
-                                  ? `${trip.preferences.substring(0, 60)}...`
+                                {trip.preferences.length > 40
+                                  ? `${trip.preferences.substring(0, 40)}...`
                                   : trip.preferences}
                               </span>
                             </div>
@@ -541,7 +541,7 @@ const SavedTrips = () => {
                           <h3 className="text-xl font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">
                             {trip.destination}
                           </h3>
-                          <div className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                          <div className="absolute top-2 right-4 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
                             {getRelativeTime(trip.savedOn)}
                           </div>
                         </div>

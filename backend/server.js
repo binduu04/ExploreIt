@@ -5,8 +5,22 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import nodemailer from 'nodemailer'
 
+import { google } from 'googleapis';
+import admin from 'firebase-admin';
+
 // Load environment variables
 dotenv.config();
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+  });
+}
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,6 +36,305 @@ app.use(express.json());
 app.get('/health', (req, res) => {
   res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
 });
+
+
+
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5173/auth/callback'
+);
+
+// Google Calendar API setup
+const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+// Middleware to verify Firebase token
+const verifyFirebaseToken = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+// Store user tokens (In production, use a database)
+const userTokens = new Map();
+
+// Routes
+
+// Get Google Calendar authorization URL
+app.post('/api/calendar/auth-url', verifyFirebaseToken, (req, res) => {
+  try {
+    const authUrl = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: [
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/userinfo.email'
+      ],
+      state: req.user.uid, // Pass user ID to identify user after OAuth
+    });
+
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Error generating auth URL:', error);
+    res.status(500).json({ error: 'Failed to generate authorization URL' });
+  }
+});
+
+// Handle OAuth callback and store tokens
+app.post('/api/calendar/callback', verifyFirebaseToken, async (req, res) => {
+  try {
+    console.log('Calendar callback received for user:', req.user.uid)
+    const { code } = req.body;
+    
+    if (!code) {
+      console.error('No authorization code provided')
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    console.log('Exchanging authorization code for tokens...')
+    const { tokens } = await oauth2Client.getToken(code);
+    console.log('Tokens received:', { 
+      access_token: tokens.access_token ? 'present' : 'missing',
+      refresh_token: tokens.refresh_token ? 'present' : 'missing',
+      expiry_date: tokens.expiry_date 
+    })
+    
+    // Store tokens for this user
+    userTokens.set(req.user.uid, tokens);
+    console.log('Tokens stored for user:', req.user.uid)
+    
+    res.json({ success: true, message: 'Calendar access granted' });
+  } catch (error) {
+    console.error('Error handling OAuth callback:', error);
+    res.status(500).json({ 
+      error: 'Failed to authorize calendar access',
+      details: error.message 
+    });
+  }
+});
+
+// Check if user has calendar permissions
+app.get('/api/calendar/permissions', verifyFirebaseToken, (req, res) => {
+  try {
+    const hasPermissions = userTokens.has(req.user.uid);
+    console.log('Checking permissions for user:', req.user.uid, 'Has permissions:', hasPermissions)
+    res.json({ hasPermissions });
+  } catch (error) {
+    console.error('Error checking permissions:', error)
+    res.status(500).json({ error: 'Failed to check permissions' });
+  }
+});
+
+// Add trip to Google Calendar
+app.post('/api/calendar/add-trip', verifyFirebaseToken, async (req, res) => {
+  try {
+    console.log('Add trip request from user:', req.user.uid)
+    const { tripData } = req.body;
+    
+    if (!tripData || !tripData.itinerary) {
+      return res.status(400).json({ error: 'Invalid trip data provided' });
+    }
+
+    const tokens = userTokens.get(req.user.uid);
+    if (!tokens) {
+      console.error('No tokens found for user:', req.user.uid)
+      return res.status(401).json({ error: 'Calendar access not granted. Please reconnect your calendar.' });
+    }
+
+    console.log('Setting OAuth credentials...')
+    // Set the tokens for this request
+    oauth2Client.setCredentials(tokens);
+
+    const events = [];
+    let totalEventsCreated = 0;
+
+    console.log('Processing', tripData.itinerary.length, 'days of itinerary')
+
+    // Create calendar events for each day
+    for (let dayIndex = 0; dayIndex < tripData.itinerary.length; dayIndex++) {
+      const day = tripData.itinerary[dayIndex];
+      console.log(`Processing day ${dayIndex + 1}:`, day.date)
+      
+      const dayDate = new Date(day.date);
+      if (isNaN(dayDate.getTime())) {
+        console.error('Invalid date:', day.date)
+        continue;
+      }
+      
+      // Morning activity
+      if (day.morning && day.morning.activity) {
+        try {
+          const morningStart = new Date(dayDate);
+          morningStart.setHours(9, 0, 0, 0); // 9:00 AM
+          const morningEnd = new Date(morningStart.getTime() + 3 * 60 * 60 * 1000); // 3 hours
+
+          const morningEvent = {
+            summary: `🌅 ${day.morning.activity}`,
+            description: `${day.morning.description || ''}\n\n📍 Location: ${day.morning.location || 'TBD'}\n💰 Cost: ${day.morning.cost || 'TBD'}\n⏱️ Duration: ${day.morning.duration || 'TBD'}`,
+            location: day.morning.location || '',
+            start: {
+              dateTime: morningStart.toISOString(),
+              timeZone: 'Asia/Kolkata',
+            },
+            end: {
+              dateTime: morningEnd.toISOString(),
+              timeZone: 'Asia/Kolkata',
+            },
+            colorId: '2', // Green
+          };
+
+          console.log('Creating morning event:', morningEvent.summary)
+          const morningResponse = await calendar.events.insert({
+            calendarId: 'primary',
+            resource: morningEvent,
+          });
+          events.push(morningResponse.data);
+          totalEventsCreated++;
+        } catch (error) {
+          console.error('Error creating morning event:', error)
+        }
+      }
+
+      // Afternoon activity
+      if (day.afternoon && day.afternoon.activity) {
+        try {
+          const afternoonStart = new Date(dayDate);
+          afternoonStart.setHours(13, 0, 0, 0); // 1:00 PM
+          const afternoonEnd = new Date(afternoonStart.getTime() + 4 * 60 * 60 * 1000); // 4 hours
+
+          const afternoonEvent = {
+            summary: `☀️ ${day.afternoon.activity}`,
+            description: `${day.afternoon.description || ''}\n\n📍 Location: ${day.afternoon.location || 'TBD'}\n💰 Cost: ${day.afternoon.cost || 'TBD'}\n⏱️ Duration: ${day.afternoon.duration || 'TBD'}`,
+            location: day.afternoon.location || '',
+            start: {
+              dateTime: afternoonStart.toISOString(),
+              timeZone: 'Asia/Kolkata',
+            },
+            end: {
+              dateTime: afternoonEnd.toISOString(),
+              timeZone: 'Asia/Kolkata',
+            },
+            colorId: '9', // Blue
+          };
+
+          console.log('Creating afternoon event:', afternoonEvent.summary)
+          const afternoonResponse = await calendar.events.insert({
+            calendarId: 'primary',
+            resource: afternoonEvent,
+          });
+          events.push(afternoonResponse.data);
+          totalEventsCreated++;
+        } catch (error) {
+          console.error('Error creating afternoon event:', error)
+        }
+      }
+
+      // Evening activity
+      if (day.evening && day.evening.activity) {
+        try {
+          const eveningStart = new Date(dayDate);
+          eveningStart.setHours(18, 0, 0, 0); // 6:00 PM
+          const eveningEnd = new Date(eveningStart.getTime() + 3 * 60 * 60 * 1000); // 3 hours
+
+          const eveningEvent = {
+            summary: `🌆 ${day.evening.activity}`,
+            description: `${day.evening.description || ''}\n\n📍 Location: ${day.evening.location || 'TBD'}\n💰 Cost: ${day.evening.cost || 'TBD'}\n⏱️ Duration: ${day.evening.duration || 'TBD'}`,
+            location: day.evening.location || '',
+            start: {
+              dateTime: eveningStart.toISOString(),
+              timeZone: 'Asia/Kolkata',
+            },
+            end: {
+              dateTime: eveningEnd.toISOString(),
+              timeZone: 'Asia/Kolkata',
+            },
+            colorId: '4', // Red/Pink
+          };
+
+          console.log('Creating evening event:', eveningEvent.summary)
+          const eveningResponse = await calendar.events.insert({
+            calendarId: 'primary',
+            resource: eveningEvent,
+          });
+          events.push(eveningResponse.data);
+          totalEventsCreated++;
+        } catch (error) {
+          console.error('Error creating evening event:', error)
+        }
+      }
+    }
+
+    console.log('Successfully created', totalEventsCreated, 'calendar events')
+    
+    if (totalEventsCreated === 0) {
+      return res.status(400).json({ 
+        error: 'No events were created. Please check your trip data.' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Successfully added ${totalEventsCreated} events to your calendar!`,
+      events: totalEventsCreated
+    });
+
+  } catch (error) {
+    console.error('Error adding trip to calendar:', error);
+    
+    // Handle specific Google API errors
+    if (error.code === 401) {
+      // Token expired or invalid
+      userTokens.delete(req.user.uid); // Remove invalid tokens
+      return res.status(401).json({ 
+        error: 'Calendar authorization expired. Please reconnect your calendar.',
+        requiresReauth: true
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to add trip to calendar',
+      details: error.message 
+    });
+  }
+});
+
+// Add a route to revoke calendar permissions
+app.post('/api/calendar/revoke', verifyFirebaseToken, async (req, res) => {
+  try {
+    const tokens = userTokens.get(req.user.uid);
+    if (tokens && tokens.access_token) {
+      // Revoke the token with Google
+      try {
+        await oauth2Client.revokeToken(tokens.access_token);
+      } catch (revokeError) {
+        console.error('Error revoking token with Google:', revokeError);
+        // Continue anyway to remove from our storage
+      }
+    }
+    
+    // Remove tokens from our storage
+    userTokens.delete(req.user.uid);
+    console.log('Calendar access revoked for user:', req.user.uid)
+    
+    res.json({ success: true, message: 'Calendar access revoked' });
+  } catch (error) {
+    console.error('Error revoking calendar access:', error);
+    res.status(500).json({ error: 'Failed to revoke calendar access' });
+  }
+});
+
+
+
+
 
 // Weather forecast endpoint
 app.post('/api/weather', async (req, res) => {
