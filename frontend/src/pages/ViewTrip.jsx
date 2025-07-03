@@ -3,6 +3,7 @@ import { ArrowLeft,Calendar,CalendarPlus } from 'lucide-react'
 import { useTrip } from '../context/TripContext'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { exportICSFile } from '../services/apiService'
 
 const ViewTrip = () => {
   const navigate = useNavigate()
@@ -12,12 +13,16 @@ const ViewTrip = () => {
   const [exportLoading, setExportLoading] = useState(false)
 
 
-  const [calendarLoading, setCalendarLoading] = useState(false)
+const [calendarLoading, setCalendarLoading] = useState(false)
 const [hasCalendarPermissions, setHasCalendarPermissions] = useState(false)
 const [calendarStatus, setCalendarStatus] = useState('')
 
+const authorizedEmails = import.meta.env.VITE_AUTHORIZED_EMAILS?.split(',') || [];
+
 useEffect(() => {
+  if (authorizedEmails.includes(user.email)) {
   checkCalendarPermissions()
+  }
 }, [user])
 
 const checkCalendarPermissions = async () => {
@@ -188,147 +193,23 @@ const addToCalendar = async () => {
   }
 }
 
-//   const [calendarLoading, setCalendarLoading] = useState(false)
-//   const [hasCalendarPermissions, setHasCalendarPermissions] = useState(false)
-//   const [calendarStatus, setCalendarStatus] = useState('')
+const exportToICS = async () => {
+    try {
+      const blob = await exportICSFile(currentTrip);
+      const url = window.URL.createObjectURL(blob);
 
-
-//    useEffect(() => {
-//     checkCalendarPermissions()
-//   }, [user])
-
-//   const checkCalendarPermissions = async () => {
-//     if (!user) return
-
-//     try {
-//       const token = await user.getIdToken()
-//       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/permissions`, {
-//         headers: {
-//           'Authorization': `Bearer ${token}`
-//         }
-//       })
-      
-//       const data = await response.json()
-//       setHasCalendarPermissions(data.hasPermissions)
-//     } catch (error) {
-//       console.error('Error checking calendar permissions:', error)
-//     }
-//   }
-
-//   // const requestCalendarPermissions = async () => {
-//   //   if (!user) return
-
-//   //   try {
-//   //     setCalendarLoading(true)
-//   //     const token = await user.getIdToken()
-      
-//   //     const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/auth-url`, {
-//   //       method: 'POST',
-//   //       headers: {
-//   //         'Authorization': `Bearer ${token}`,
-//   //         'Content-Type': 'application/json'
-//   //       }
-//   //     })
-
-//   //     const data = await response.json()
-      
-//   //     if (data.authUrl) {
-//   //       // Open Google OAuth in a new window
-//   //       const authWindow = window.open(data.authUrl, 'GoogleAuth', 'width=500,height=600')
-        
-//   //       // Listen for the OAuth completion
-//   //       const checkClosed = setInterval(() => {
-//   //         if (authWindow.closed) {
-//   //           clearInterval(checkClosed)
-//   //           // Check permissions again after OAuth
-//   //           setTimeout(checkCalendarPermissions, 1000)
-//   //           setCalendarLoading(false)
-//   //         }
-//   //       }, 1000)
-//   //     }
-//   //   } catch (error) {
-//   //     console.error('Error requesting calendar permissions:', error)
-//   //     setCalendarLoading(false)
-//   //   }
-//   // }
-
-
-//   const requestCalendarPermissions = async () => {
-//   if (!user) return
-
-//   try {
-//     setCalendarLoading(true)
-//     const token = await user.getIdToken()
-
-//     const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/auth-url`, {
-//       method: 'POST',
-//       headers: {
-//         'Authorization': `Bearer ${token}`,
-//         'Content-Type': 'application/json'
-//       }
-//     })
-
-//     const data = await response.json()
-
-//     if (data.authUrl) {
-//       const authWindow = window.open(data.authUrl, '_blank', 'width=500,height=600')
-
-//       const checkMessage = (event) => {
-//         if (event.origin !== window.location.origin) return
-//         if (event.data === 'oauth_success') {
-//           window.removeEventListener('message', checkMessage)
-//           setTimeout(checkCalendarPermissions, 500)
-//           setCalendarLoading(false)
-//         }
-//       }
-
-//       window.addEventListener('message', checkMessage)
-//     }
-//   } catch (error) {
-//     console.error('Error requesting calendar permissions:', error)
-//     setCalendarLoading(false)
-//   }
-// }
-
-
-//   const addToCalendar = async () => {
-//     if (!user || !currentTrip) return
-
-//     try {
-//       setCalendarLoading(true)
-//       setCalendarStatus('Adding to calendar...')
-      
-//       const token = await user.getIdToken()
-      
-//       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/add-trip`, {
-//         method: 'POST',
-//         headers: {
-//           'Authorization': `Bearer ${token}`,
-//           'Content-Type': 'application/json'
-//         },
-//         body: JSON.stringify({ tripData: currentTrip })
-//       })
-
-//       const data = await response.json()
-      
-//       if (data.success) {
-//         setCalendarStatus(`✅ ${data.message}`)
-//         setTimeout(() => setCalendarStatus(''), 3000)
-//       } else {
-//         setCalendarStatus('❌ Failed to add to calendar')
-//         setTimeout(() => setCalendarStatus(''), 3000)
-//       }
-//     } catch (error) {
-//       console.error('Error adding to calendar:', error)
-//       setCalendarStatus('❌ Error adding to calendar')
-//       setTimeout(() => setCalendarStatus(''), 3000)
-//     } finally {
-//       setCalendarLoading(false)
-//     }
-//   }
-
-
-
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentTrip.destination.replace(/\s+/g, '_')}_itinerary.ics`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('ICS export failed:', err);
+      alert('Export to calendar failed. Please try again.');
+    }
+  };
 
   // Export to PDF function using browser's print functionality with better formatting
   const exportToPDF = async () => {
@@ -991,35 +872,49 @@ const addToCalendar = async () => {
 
   {/* Calendar Integration */}
                 {user && (
-                  <div className="space-y-2">
-                    {!hasCalendarPermissions ? (
-                      <button
-                        onClick={requestCalendarPermissions}
-                        disabled={calendarLoading}
-                        className="flex justify-center bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
-                      >
-                        <Calendar className="w-5 h-5 mr-2" />
-                        {calendarLoading ? 'Connecting...' : 'Connect Calendar'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={addToCalendar}
-                        disabled={calendarLoading}
-                        className="flex justify-center bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
-                      >
-                        <CalendarPlus className="w-5 h-5 mr-2" />
-                        {calendarLoading ? 'Adding...' : 'Add to Calendar'}
-                      </button>
-                    )}
-                    
-                    {/* Calendar Status */}
-                    {calendarStatus && (
-                      <div className="text-center text-sm bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg">
-                        {calendarStatus}
-                      </div>
-                    )}
-                  </div>
-                )}
+  <div className="space-y-2">
+    {!hasCalendarPermissions ? (
+      <button
+        onClick={() => {
+          // Check if user email is in authorized list
+          if (authorizedEmails.includes(user.email)) {
+            requestCalendarPermissions();
+          } else {
+            exportToICS();
+          }
+        }}
+        disabled={calendarLoading}
+        className="w-full flex justify-center bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+      >
+        <Calendar className="w-5 h-5 mr-2" />
+        {calendarLoading ? 'Connecting...' : 'Connect Calendar'}
+      </button>
+    ) : (
+      <button
+        onClick={() => {
+          // Check if user email is in authorized list
+          if (authorizedEmails.includes(user.email)) {
+            addToCalendar();
+          } else {
+            exportToICS();
+          }
+        }}
+        disabled={calendarLoading}
+        className=" w-full flex justify-center bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+      >
+        <CalendarPlus className="w-5 h-5 mr-2" />
+        {calendarLoading ? 'Adding...' : 'Add to Calendar'}
+      </button>
+    )}
+    
+    {/* Calendar Status */}
+    {calendarStatus && (
+      <div className="text-center text-sm bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg">
+        {calendarStatus}
+      </div>
+    )}
+  </div>
+)}
                 
                 {/* Export Options */}
                 <div className="flex gap-2 flex-wrap">

@@ -137,6 +137,31 @@ const sendChatMessage = async (message, tripId, userId, tripContext, chatHistory
   }
 };
 
+const exportICSFile = async (tripData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/download-ics`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ tripData })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to generate ICS file');
+    }
+
+    const blob = await response.blob();
+    return blob;
+
+  } catch (error) {
+    console.error('❌ ICS export failed:', error.message);
+    throw error;
+  }
+};
+
+
 // Health check function to verify backend connectivity
 const checkBackendHealth = async () => {
   try {
@@ -160,6 +185,7 @@ export {
   generateItineraryWithGemini,
   generateCompleteItinerary,
   checkBackendHealth,
-  sendChatMessage
+  sendChatMessage,
+  exportICSFile
 };
 
