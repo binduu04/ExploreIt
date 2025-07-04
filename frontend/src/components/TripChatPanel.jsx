@@ -237,11 +237,13 @@ const TripChatPanel = ({ trip, isOpen, onClose }) => {
       }
 
       const aiResponse = await generateAIResponse(currentInput, tripContext, recentHistory)
+
+      console.log(aiResponse);
       
       const aiMessage = {
         id: `ai_${Date.now()}`,
         type: 'ai',
-        content: aiResponse,
+        content: aiResponse || '(no reply)',
         timestamp: new Date(),
         chatId: chatId
       }

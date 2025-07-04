@@ -12,6 +12,7 @@ const ViewTrip = () => {
   //const [saveLoading, setSaveLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
 
+  const [showICSAlert, setShowICSAlert] = useState(false)
 
 const [calendarLoading, setCalendarLoading] = useState(false)
 const [hasCalendarPermissions, setHasCalendarPermissions] = useState(false)
@@ -20,7 +21,7 @@ const [calendarStatus, setCalendarStatus] = useState('')
 const authorizedEmails = import.meta.env.VITE_AUTHORIZED_EMAILS?.split(',') || [];
 
 useEffect(() => {
-  if (authorizedEmails.includes(user.email)) {
+  if (user?.email && authorizedEmails.includes(user.email)) {
   checkCalendarPermissions()
   }
 }, [user])
@@ -194,23 +195,69 @@ const addToCalendar = async () => {
 }
 
 const exportToICS = async () => {
-    try {
-      const blob = await exportICSFile(currentTrip);
-      const url = window.URL.createObjectURL(blob);
+  try {
+    const blob = await exportICSFile(currentTrip);
+    const url = window.URL.createObjectURL(blob);
 
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${currentTrip.destination.replace(/\s+/g, '_')}_itinerary.ics`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('ICS export failed:', err);
-      alert('Export to calendar failed. Please try again.');
-    }
-  };
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${currentTrip.destination.replace(/\s+/g, '_')}_itinerary.ics`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    // Show the alert after successful download
+    setShowICSAlert(true);
+    
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+      setShowICSAlert(false);
+    }, 100000);
+    
+  } catch (err) {
+    console.error('ICS export failed:', err);
+    alert('Export to calendar failed. Please try again.');
+  }
+};
 
+const ICSAlert = () => {
+  if (!showICSAlert) return null;
+  
+  return (
+    <div className="fixed top-4 left-4 z-50 bg-white rounded-lg shadow-2xl border border-gray-200 p-4 max-w-sm animate-in slide-in-from-right duration-300">
+      <div className="flex items-start gap-3">
+        <div className="text-green-500 text-xl">📅</div>
+        <div className="flex-1">
+          <h4 className="font-bold text-gray-800 mb-2">Calendar File Downloaded!</h4>
+          <p className="text-sm text-gray-600 mb-3">
+            To add events to Google Calendar:
+          </p>
+          <ol className="font-semibold text-xs text-gray-600 space-y-1 mb-3">
+            <li>1. Open Google Calendar</li>
+            <li>2. Click the "+" next to "Other calendars"</li>
+            <li>3. Select "Import"</li>
+            <li>4. Upload the downloaded .ics file</li>
+            <li>5. Click "Import"</li>
+          </ol>
+          <button
+            onClick={() => setShowICSAlert(false)}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Got it!
+          </button>
+        </div>
+        <button
+          onClick={() => setShowICSAlert(false)}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+};
+  
   // Export to PDF function using browser's print functionality with better formatting
   const exportToPDF = async () => {
     setExportLoading(true)
@@ -793,11 +840,10 @@ const exportToICS = async () => {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
           <div className="text-8xl mb-6">🗺️</div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">Ready for Your Next Adventure?</h2>
-          <p className="text-gray-600 text-lg mb-8">Create a trip to see your personalized itinerary here</p>
-          <div className="bg-white rounded-xl p-6 shadow-lg">
-            <p className="text-sm text-gray-500">💡 Tip: Fill out the trip form to generate an amazing itinerary tailored just for you!</p>
-          </div>
+          <button
+              onClick={() => navigate('/my-trips')}
+              className="bg-blue-400 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >Back to Saved Trips</button>
         </div>
       </div>
     )
@@ -820,6 +866,8 @@ const exportToICS = async () => {
     }
     return icons[condition] || '🌤️'
   }
+
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -942,7 +990,7 @@ const exportToICS = async () => {
             </div>
           </div>
         </div> 
-
+{showICSAlert && <ICSAlert />}
         {/* Trip Highlights */}
         {currentTrip.summary?.highlights && (
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 break-inside-avoid">

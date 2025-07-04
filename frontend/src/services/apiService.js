@@ -139,7 +139,7 @@ const sendChatMessage = async (message, tripId, userId, tripContext, chatHistory
 
 const exportICSFile = async (tripData) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/download-ics`, {
+    const response = await fetch(`${API_BASE_URL}/api/calendar/download-ics`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
