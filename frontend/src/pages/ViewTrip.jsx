@@ -60,7 +60,7 @@ const requestCalendarPermissions = async () => {
     
     console.log('Requesting calendar permissions...')
     const token = await user.getIdToken()
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/auth-url`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/calendar/auth-url`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -159,7 +159,7 @@ const addToCalendar = async () => {
     console.log('Adding trip to calendar:', currentTrip)
     const token = await user.getIdToken()
     
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/add-trip`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/calendar/add-trip`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
