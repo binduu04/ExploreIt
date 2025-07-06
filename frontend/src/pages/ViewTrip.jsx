@@ -32,7 +32,7 @@ const checkCalendarPermissions = async () => {
   try {
     console.log('Checking calendar permissions...')
     const token = await user.getIdToken()
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/calendar/permissions`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/calendar/permissions`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

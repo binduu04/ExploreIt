@@ -8,7 +8,7 @@ import TripPlanner from './pages/TripPlanner'
 import Itinerary from './pages/Itinerary'
 import SavedTrips from './pages/SavedTrips'
 import ViewTrip from './pages/ViewTrip'
-import AuthCallback from './pages/AuthCallBack'
+import AuthCallback from './pages/AuthCallback'
 import './App.css'
 
 function App() {

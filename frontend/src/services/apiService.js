@@ -1,5 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 // Weather forecast with backend API
 const getWeatherForecast = async (destination, startDate, duration) => {
   console.log('🌤️ Fetching weather for:', destination, 'starting', startDate, 'for', duration, 'days');
