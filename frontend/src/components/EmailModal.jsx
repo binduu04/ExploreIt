@@ -18,7 +18,7 @@ const EmailModal = ({ isOpen, trip, onClose, user }) => {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/send-trip-email`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/send-trip-email`,
         {
           method: "POST",
           headers: {
