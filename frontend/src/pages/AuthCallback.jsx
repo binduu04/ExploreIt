@@ -61,9 +61,7 @@ export default function AuthCallback() {
 
         console.log("Sending authorization code to backend...");
         const response = await fetch(
-          `${
-            import.meta.env.VITE_API_BASE_URL
-          }/api/calendar/callback`,
+          `${import.meta.env.VITE_API_BASE_URL}/api/calendar/callback`,
           {
             method: "POST",
             headers: {
